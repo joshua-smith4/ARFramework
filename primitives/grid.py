@@ -20,6 +20,44 @@ class GridHashAndTreeStorageStrategy:
         self.compFunc = compFunc
         self.hashIdx = 0
 
+    def removeRegionContainingPoint(self, point):
+        cur = self.tree
+        if cur is None: return None
+        res = self.compFunc(point, cur.data)
+        while cur is not None and res != 0:
+            if res == -1:
+                cur = cur.less
+            else:
+                cur = cur.greater
+            if cur is not None:
+                res = self.compFunc(point, cur.data)
+        if cur is None: return None
+        ret = cur.data
+        self.deleteNode(cur)
+        return ret
+
+    def deleteNode(self, n):
+        if n.less is not None and n.greater is not None:
+            # has two children
+            tmp = n
+            cur = n.less
+            while True:
+                if cur.greater is None:
+                    break
+                cur = cur.greater
+            n = cur
+            cur = None
+            n.less = tmp.less
+            n.greater = tmp.greater
+            return
+        if n.less is not None:
+            n = n.less
+            return
+        if n.greater is not None:
+            n = n.greater
+            return
+        n = None
+
     def getRegionContainingPoint(self, point):
         '''
         This function returns None if region is not found
@@ -44,6 +82,22 @@ class GridHashAndTreeStorageStrategy:
         tmp = self.hashIdx
         self.hashIdx += 1
         return cur.data, tmp
+
+    def traverse(self, func):
+        self.traverse_helper(func, self.tree)
+
+    def traverse_helper(self, func, cur):
+        if cur is None: return
+        self.traverse_helper(func, cur.less)
+        func(cur.data)
+        self.traverse_helper(func, cur.greater)
+
+    def __repr__(self):
+        ret = []
+        def compileResults(x, ret=ret):
+            ret += [str(x)]
+        self.traverse(compileResults)
+        return '\n'.join(str(x) for x in ret)
 
     def getRegionByIdx(self, hashIdx, keepEntry=False):
         try:
