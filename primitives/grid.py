@@ -41,9 +41,9 @@ class GridHashAndTreeStorageStrategy:
             # has two children
             tmp = n
             cur = n.less
-            while True:
-                if cur.greater is None:
-                    break
+            parcur = n
+            while cur.greater is not None:
+                parcur = cur
                 cur = cur.greater
             n = cur
             cur = None
