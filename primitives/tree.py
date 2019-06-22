@@ -36,9 +36,19 @@ class Tree:
     def __init__(self, compFunc, initialValues=[]):
         self._root = None
         self.compFunc = compFunc
-        self.size = 0
+        self.__size = 0
         for val in initialValues:
             self.insert(val)
+
+    def size():
+        def fget(self):
+            return self.__size
+        def fset(self, value):
+            if value < 0:
+                assert False, "size went below zero"
+            self.__size = value
+        return locals()
+    size = property(**size())
 
     def getUncle(self, node):
         if node.p is None or node.gp is None: return None
@@ -51,6 +61,7 @@ class Tree:
         if self._root == None :
             self._root = Tree.Node(val)
             self._root.black = True
+            self.size += 1
         else:
             self.__insert(val, self._root)
 
@@ -289,7 +300,7 @@ class Tree:
         if self._root.l is not None: self._root.l.p = self._root
         self._root.p = None
 
-    def _rightRotate(self, node, right=True):
+    def __rightRotate(self, node, right=True):
         if node is None: return
         if right is None and node is not self._root:
             assert False, "Cannot perform rotation on node passed by value"
@@ -334,7 +345,7 @@ class Tree:
         if self._root.r is not None: self._root.r.p = self._root
         self._root.p = None
 
-    def _leftRotate(self, node, right=True):
+    def __leftRotate(self, node, right=True):
         if node is None: return
         if right is None and node is not self._root:
             assert False, "Cannot perform rotation on node passed by value"
@@ -372,16 +383,8 @@ def compFuncInt(a,b):
     elif a > b: return 1
     return 0
 
-tree = Tree(compFuncInt)
-tree.insert(5)
-tree.insert(6)
-tree.insert(4)
-tree.insert(8)
-tree.insert(7)
-tree.insert(2)
-tree.insert(3)
-tree.insert(19)
-tree.insert(12)
-tree.insert(11)
+t = Tree(compFuncInt)
 
-print(str(tree))
+import random
+for i in range(3000):
+    t.insert(random.randint(1,10000))
