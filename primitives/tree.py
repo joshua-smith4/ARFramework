@@ -47,47 +47,43 @@ class Tree:
         if comp == 1: return node.gp.l
         assert False, "Tree is broken!"
 
-    def getGrandparent(self, node):
-        return node.gp
-
     def insert(self, val):
         if self._root == None :
             self._root = Tree.Node(val)
             self._root.black = True
-            self._root.p = None
         else:
-            self._insert(val, self._root)
+            self.__insert(val, self._root)
 
-    def _insert(self, val, node):
+    def __insert(self, val, node):
         comp = self.compFunc(val, node.v)
         if comp == -1:
             if node.l is not None:
-                self._insert(val, node.l)
+                self.__insert(val, node.l)
             else:
                 node.l = Tree.Node(val)
                 node.l.p = node
                 self.size += 1
         elif comp == 1:
             if node.r is not None:
-                self._insert(val, node.r)
+                self.__insert(val, node.r)
             else:
                 node.r = Tree.Node(val)
                 node.r.p = node
                 self.size += 1
 
     def find(self, val):
-        return self._find(val, self._root)
+        return self.__find(val, self._root)
 
-    def _find(self, val, node):
+    def __find(self, val, node):
         if node is None:
             return None
         comp = self.compFunc(val, node.v)
         if(comp == 0):
-            return node.v
+            return node
         elif comp == -1:
-            return self._find(val, node.l)
+            return self.__find(val, node.l)
         elif comp == 1:
-            return self._find(val, node.r)
+            return self.__find(val, node.r)
 
     def pop_root(self):
         if self._root is None:
@@ -102,6 +98,7 @@ class Tree:
             else:
                 self._root = oldRoot.r
                 oldRoot.r = None
+            self._root.p = None
         else:
             nextRoot = self._root.l
             if nextRoot.r is None:
@@ -121,6 +118,9 @@ class Tree:
                 self._root.r = oldRoot.r
                 oldRoot.l = None
                 oldRoot.r = None
+            if nextRoot.l is not None: nextRoot.l.p = nextRoot
+            if nextRoot.r is not None: nextRoot.r.p = nextRoot
+            nextRoot.p = None
         self.size -= 1
         return oldRoot.v
 
@@ -131,10 +131,10 @@ class Tree:
         if comp == 0:
             return self.pop_root()
         if comp == -1:
-            return self._removeLeft(val, self._root)
-        return self._removeRight(val, self._root)
+            return self.__removeLeft(val, self._root)
+        return self.__removeRight(val, self._root)
 
-    def _removeLeft(self, val, node):
+    def __removeLeft(self, val, node):
         if node.l is None:
             return None
         comp = self.compFunc(val, node.l.v)
@@ -149,6 +149,7 @@ class Tree:
                 else:
                     node.l = toRemove.r
                     toRemove.r = None
+                node.l.p = node
             else:
                 nextRoot = toRemove.l
                 if nextRoot.r is None:
@@ -168,13 +169,16 @@ class Tree:
                     node.l.r = toRemove.r
                     toRemove.l = None
                     toRemove.r = None
+                if nextRoot.l is not None: nextRoot.l.p = nextRoot
+                if nextRoot.r is not None: nextRoot.r.p = nextRoot
+                nextRoot.p = node
             self.size -= 1
             return toRemove.v
         if comp == -1:
-            return self._removeLeft(val, node.l)
-        return self._removeRight(val, node.l)
+            return self.__removeLeft(val, node.l)
+        return self.__removeRight(val, node.l)
 
-    def _removeRight(self, val, node):
+    def __removeRight(self, val, node):
         if node.r is None:
             return None
         comp = self.compFunc(val, node.r.v)
@@ -189,6 +193,7 @@ class Tree:
                 else:
                     node.r = toRemove.r
                     toRemove.r = None
+                node.r.p = node
             else:
                 nextRoot = toRemove.l
                 if nextRoot.r is None:
@@ -208,47 +213,50 @@ class Tree:
                     node.r.r = toRemove.r
                     toRemove.l = None
                     toRemove.r = None
+                if nextRoot.l is not None: nextRoot.l.p = nextRoot
+                if nextRoot.r is not None: nextRoot.r.p = nextRoot
+                nextRoot.p = node
             self.size -= 1
             return toRemove.v
         if comp == -1:
-            return self._removeLeft(val, node.r)
-        return self._removeRight(val, node.r)
+            return self.__removeLeft(val, node.r)
+        return self.__removeRight(val, node.r)
 
-    def inorder_traversal(self, func):
-        self._inorder_traversal(self._root, func)
+    def traversal(self, func):
+        self.__inorder_traversal(self._root, func)
 
-    def _inorder_traversal(self, node, func):
+    def __inorder_traversal(self, node, func):
         if node is None:
             return
-        self._inorder_traversal(node.l, func)
+        self.__inorder_traversal(node.l, func)
         func(node.v)
-        self._inorder_traversal(node.r, func)
+        self.__inorder_traversal(node.r, func)
 
     def inorder_generator(self):
-        yield from self._inorder_generator(self._root)
+        yield from self.__inorder_generator(self._root)
 
-    def _inorder_generator(self, node):
+    def __inorder_generator(self, node):
         if node is not None:
-            yield from self._inorder_generator(node.l)
+            yield from self.__inorder_generator(node.l)
             yield node.v
-            yield from self._inorder_generator(node.r)
+            yield from self.__inorder_generator(node.r)
 
     def preorder_generator(self):
-        yield from self._preorder_generator(self._root)
+        yield from self.__preorder_generator(self._root)
 
-    def _preorder_generator(self, node):
+    def __preorder_generator(self, node):
         if node is not None:
             yield node.v
-            yield from self._preorder_generator(node.l)
-            yield from self._preorder_generator(node.r)
+            yield from self.__preorder_generator(node.l)
+            yield from self.__preorder_generator(node.r)
 
     def postorder_generator(self):
-        yield from self._postorder_generator(self._root)
+        yield from self.__postorder_generator(self._root)
 
-    def _postorder_generator(self, node):
+    def __postorder_generator(self, node):
         if node is not None:
-            yield from self._postorder_generator(node.l)
-            yield from self._postorder_generator(node.r)
+            yield from self.__postorder_generator(node.l)
+            yield from self.__postorder_generator(node.r)
             yield node.v
 
     def __iter__(self, traversal='preorder'):
@@ -274,6 +282,12 @@ class Tree:
         self._root = oldRoot.l
         oldRoot.l = self._root.r
         self._root.r = oldRoot
+        if self._root.r is not None:
+            self._root.r.p = self._root
+            if self._root.r.l is not None:
+                self._root.r.l.p = self._root.r
+        if self._root.l is not None: self._root.l.p = self._root
+        self._root.p = None
 
     def _rightRotate(self, node, right=True):
         if node is None: return
@@ -288,12 +302,24 @@ class Tree:
             node.r = n.l
             n.l = node.r.r
             node.r.r = n
+            if node.r.r is not None:
+                node.r.r.p = node.r
+                if node.r.r.l is not None:
+                    node.r.r.l.p = node.r.r
+            if node.r.l is not None: node.r.l.p = node.r
+            node.r.p = node
         else:
             if node.l is None or node.l.l is None: return
             n = node.l
             node.l = n.l
             n.l = node.l.r
             node.l.r = n
+            if node.l.r is not None:
+                node.l.r.p = node.l
+                if node.l.r.l is not None:
+                    node.l.r.l.p = node.l.r
+            if node.l.l is not None: node.l.l.p = node.l
+            node.l.p = node
 
     def __leftRotateRoot(self):
         if self._root is None or self._root.r is None: return
@@ -301,6 +327,12 @@ class Tree:
         self._root = oldRoot.r
         oldRoot.r = self._root.l
         self._root.l = oldRoot
+        if self._root.l is not None:
+            self._root.l.p = self._root
+            if self._root.l.r is not None:
+                self._root.l.r.p = self._root.l
+        if self._root.r is not None: self._root.r.p = self._root
+        self._root.p = None
 
     def _leftRotate(self, node, right=True):
         if node is None: return
@@ -315,12 +347,24 @@ class Tree:
             node.r = n.r
             n.r = node.r.l
             node.r.l = n
+            if node.r.l is not None:
+                node.r.l.p = node.r
+                if node.r.l.r is not None:
+                    node.r.l.r.p = node.r.l
+            if node.r.r is not None: node.r.r.p = node.r
+            node.r.p = node
         else:
             if node.l is None or node.l.r is None: return
             n = node.l
             node.l = n.r
             n.r = node.l.l
             node.l.l = n
+            if node.l.l is not None:
+                node.l.l.p = node.l
+                if node.l.l.r is not None:
+                    node.l.l.r.p = node.l.l
+            if node.l.r is not None: node.l.r.p = node.l
+            node.l.p = node
 
 
 def compFuncInt(a,b):
