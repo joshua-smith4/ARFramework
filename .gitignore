@@ -19,3 +19,26 @@ Sessionx.vim
 tags
 # Persistent undo
 [._]*.un~
+
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+*.manifest
+*.spec
+
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
