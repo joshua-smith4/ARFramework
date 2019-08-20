@@ -33,12 +33,17 @@ namespace grid
 
     struct IntellifeatureDimSelection
     {
-        std::vector<point> averages;
+        IntellifeatureDimSelection(std::vector<point>);
+        std::vector<std::size_t> operator()(region const&, std::size_t);
+        std::function<double(point const&, point const&)> norm_func;
+        const std::vector<point> averages;
+        const point x0;
+        const std::size_t orig_class;
     };
 
     struct IntelliFGSMRegionAbstraction
     {
-        FGSMRegionAbstraction(std::size_t, std::function<point(point const&)>&&);
+        IntelliFGSMRegionAbstraction(std::size_t, std::function<point(point const&)>&&);
         std::set<point> operator()(region const&);
         std::size_t maxPoints;
         std::function<point(point const&)> gradient;

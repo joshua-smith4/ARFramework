@@ -63,9 +63,47 @@ std::vector<std::size_t> maxAverageDimSelection(grid::region const& r, std::size
     return {indices.begin(), indices.begin() + numDims};
 }
 
+grid::IntellifeatureDimSelection::IntellifeatureDimSelection()
+    : averages()
+{
+}
+
+std::vector<std::size_t> 
+grid::IntellifeatureDimSelection::operator()(grid::region const& r, std::size_t numDims)
+{
+    if(numDims > r.size())
+        throw std::domain_error("Number of selected dimensions needs to match the dimensionality of the input")
+    auto centralPointSet = grid::centralPointRegionAbstraction(r);
+    if(centralPointSet.empty()) return {};
+    auto p = *centralPointSet.begin();
+    std::vector<double> norms(averages.size());
+    for(auto i = 0u; i < averages.size(); ++i)
+    {
+        if(i == orig_class) continue;
+        norms[i] = norm_func(averages[i], p);
+    }
+    std::vector<std::size_t> indices(averages.size());
+    std::sort(indices.begin(), indices.end(), [&norms](std::size_t a, std::size_t b)
+            {
+                return norms[a] < norms[b];
+            });
+    if(indices.back() != orig_class)
+    {
+        std::remove(indices.begin(), indices.end(), orig_class);
+        indices.push_back(orig_class);
+    }
+    auto minDiff = p - averages[indices[0]];
+}
+
+grid::IntelliFGSMRegionAbstraction::IntelliFGSMRegionAbstraction()
+    : maxPoints(), gradient()
+{
+}
+
 bool operator<(grid::point const& p, grid::region const& r)
 {
-    if(p.size() != r.size()) throw std::domain_error("Point and region must have the same dimensionality.");
+    if(p.size() != r.size()) 
+        throw std::domain_error("Point and region must have the same dimensionality.");
     for(auto i = 0u; i < p.size(); ++i)
     {
         if(p[i] < r[i].first) return true;
