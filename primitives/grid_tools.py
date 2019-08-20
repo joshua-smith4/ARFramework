@@ -1,11 +1,10 @@
 import numpy as np
 
-def lexicalOrdering(a,b,predicate,getShapeWithoutChannels=lambda x,y: x.shape):
+def lexicalOrderingCpp(a,b,predicate,getShapeWithoutChannels=lambda x,y: x.shape):
     '''
     Returns the lexicographical ordering of a and b based on a predicate
-    0: a and b are same
-    -1: a is less than b
-    1: a is greater than b
+    True: a <= b
+    False: a > b
     '''
     shape = getShapeWithoutChannels(a, b)
     numElements = np.prod(shape)
@@ -13,10 +12,31 @@ def lexicalOrdering(a,b,predicate,getShapeWithoutChannels=lambda x,y: x.shape):
     while i < numElements:
         shapedIndex = np.unravel_index(i, shape)
         i += 1
-        if predicate(a[shapedIndex], b[shapedIndex]) != 0:
-            break
-    return predicate(a[shapedIndex], b[shapedIndex])
+        res = predicate(a[shapedIndex], b[shapedIndex])  
+        if res != 0:
+            if res == -1: return True
+            return False
+    res = predicate(a[shapedIndex], b[shapedIndex])  
+    if res == -1 or res == 0:
+        return True
+    return False
 
+def lexicalOrderingPy(a,b,predicate,getShapeWithoutChannels=lambda x,y: x.shape):
+    '''
+    Returns the lexicographical ordering of a and b based on a predicate
+    True: a <= b
+    False: a > b
+    '''
+    shape = getShapeWithoutChannels(a, b)
+    numElements = np.prod(shape)
+    i = 0
+    while i < numElements:
+        shapedIndex = np.unravel_index(i, shape)
+        i += 1
+        res = predicate(a[shapedIndex], b[shapedIndex])  
+        if res != 0:
+            return res
+    return predicate(a[shapedIndex], b[shapedIndex])  
 # if comparing points to regions, the point should be argument 1 (r1)
 # and the region should be argument 2 (r2)
 # if not, an error will be thrown
@@ -53,5 +73,5 @@ def lexicographicalOrderingOnRegions(r1, r2):
         elif a_elem < b_elem:
             return -1
         return 1
-    return lexicalOrdering(r1, r2, predicate)
+    return lexicalOrderingCpp(r1, r2, predicate)
 
