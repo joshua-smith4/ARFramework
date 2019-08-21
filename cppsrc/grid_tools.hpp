@@ -17,6 +17,7 @@ namespace grid
     using region_filter_strategy_t = std::function<bool(region const&)>;
     using region_abstraction_strategy_t = std::function<std::set<point>(region const&)>;
     using dimension_selection_strategy_t = std::function<std::vector<std::size_t>(region const&, std::size_t)>;
+    using norm_function_type_t = std::function<double(point const&, point const&)>;
 
     bool isValidRegion(region const&);
 
@@ -33,12 +34,12 @@ namespace grid
 
     struct IntellifeatureDimSelection
     {
-        IntellifeatureDimSelection(std::vector<point>);
+        IntellifeatureDimSelection(std::vector<point> const&, norm_function_type_t, std::size_t);
         std::vector<std::size_t> operator()(region const&, std::size_t);
-        std::function<double(point const&, point const&)> norm_func;
         const std::vector<point> averages;
-        const point x0;
-        const std::size_t orig_class;
+    private:
+        norm_function_type_t norm_func;
+        std::size_t orig_class;
     };
 
     struct IntelliFGSMRegionAbstraction
@@ -58,9 +59,25 @@ bool operator<(grid::point const&, grid::point const&);
 grid::point operator-(grid::point const&, grid::point const&);
 grid::point operator+(grid::point const&, grid::point const&);
 
+namespace std
+{
+    grid::point abs(grid::point const&);
+}
+
 std::ostream& operator<<(std::ostream& os, grid::region const&);
 std::ostream& operator<<(std::ostream& os, grid::point const&);
 
+template <class ArrayLike>
+std::vector<std::size_t> getSortedIndices(ArrayLike const& arr, bool asc = true)
+{
+    std::vector<std::size_t> retInd(arr.size());
+    std::iota(retInd.begin(), retInd.end(), 0u);
+    std::sort(retInd.begin(), retInd.end(), [&arr, asc](std::size_t a, std::size_t b)
+            {
+                return asc ? arr[a] < arr[b] : arr[a] > arr[b];
+            });
+    return retInd;
+}
 
 #endif
 

@@ -48,23 +48,19 @@ std::vector<std::size_t> maxAverageDimSelection(grid::region const& r, std::size
         / static_cast<grid::numeric_type_t>(p.size());
 
     grid::point dif(p.size());
-    std::vector<std::size_t> indices(p.size());
     for(auto i = 0u; i < p.size(); ++i)
     {
         dif[i] = std::abs(avg - elem);
-        indices[i] = i;
     }
-
-    std::sort(indices.begin(), indices.end(), [&dif](std::size_t a, std::size_t b)
-            {
-                return dif[a] > dif[b];
-            });
-
+    auto indices = getSortedIndices(dif, false /* descending */);
     return {indices.begin(), indices.begin() + numDims};
 }
 
-grid::IntellifeatureDimSelection::IntellifeatureDimSelection()
-    : averages()
+grid::IntellifeatureDimSelection::IntellifeatureDimSelection(
+        std::vector<point> const& avgs,
+        norm_function_type_t norm,
+        std::size_t orig_cl)
+    : averages(avgs), norm_func(norm), orig_class(orig_cl)
 {
 }
 
@@ -72,27 +68,25 @@ std::vector<std::size_t>
 grid::IntellifeatureDimSelection::operator()(grid::region const& r, std::size_t numDims)
 {
     if(numDims > r.size())
-        throw std::domain_error("Number of selected dimensions needs to match the dimensionality of the input")
+        throw std::domain_error("Number of selected dimensions needs to match the dimensionality of the input");
+    // get central point of region
     auto centralPointSet = grid::centralPointRegionAbstraction(r);
     if(centralPointSet.empty()) return {};
     auto p = *centralPointSet.begin();
+    // calculate the norms between the averages and the central point
     std::vector<double> norms(averages.size());
     for(auto i = 0u; i < averages.size(); ++i)
     {
+        // skip the original class
         if(i == orig_class) continue;
         norms[i] = norm_func(averages[i], p);
     }
-    std::vector<std::size_t> indices(averages.size());
-    std::sort(indices.begin(), indices.end(), [&norms](std::size_t a, std::size_t b)
-            {
-                return norms[a] < norms[b];
-            });
-    if(indices.back() != orig_class)
-    {
-        std::remove(indices.begin(), indices.end(), orig_class);
-        indices.push_back(orig_class);
-    }
-    auto minDiff = p - averages[indices[0]];
+    auto indices = getSortedIndices(norms);
+    std::remove(indices.begin(), indices.end(), orig_class);
+    indices.push_back(orig_class);
+    auto minDiff = std::abs(p - averages[indices[0]]);
+    indices = getSortedIndices(minDiff, false /* descending */);
+    return {indices.begin(), indices.begin() + numDims};
 }
 
 grid::IntelliFGSMRegionAbstraction::IntelliFGSMRegionAbstraction()
@@ -146,6 +140,34 @@ bool operator<(grid::point const& p1, grid::point const& p2)
         if(p1[i] > p2[i]) return false;
     }
     return false;
+}
+
+grid::point operator-(grid::point const& a, grid::point const& b)
+{
+    grid::point retVal(a.size());
+    for(auto i = 0u; i < a.size(); ++i)
+    {
+        retVal[i] = a[i] - b[i];
+    }
+    return retVal;
+}
+
+grid::point operator+(grid::point const& a, grid::point const& b)
+{
+    grid::point retVal(a.size());
+    for(auto i = 0u; i < a.size(); ++i)
+    {
+        retVal[i] = a[i] + b[i];
+    }
+    return retVal;
+}
+
+grid::point std::abs(grid::point const& p)
+{
+    grid::point ret(p.size());
+    for(auto i = 0u; i < p.size(); ++i)
+        ret[i] = std::abs(p[i]);
+    return ret;
 }
 
 std::ostream& operator<<(std::ostream& os, grid::region const& r)

@@ -43,6 +43,7 @@ env.bak/
 venv.bak/
 bin
 lib
+include
 
 pyvenv.cfg
 
