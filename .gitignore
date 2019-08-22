@@ -41,9 +41,9 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-bin
-lib
-include
+bin/
+lib/
+include/
 
 pyvenv.cfg
 
