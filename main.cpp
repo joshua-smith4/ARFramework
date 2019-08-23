@@ -26,20 +26,26 @@
 
 #include "GraphManager.hpp"
 
+// command
+//
+/*
+
+bazel-bin/tensorflow/ARFramework/gm_label_image --root_dir="/Users/JoshuaSmith/tensorflow/tensorflow/ARFramework" --graph="mnist_model.pb" --input_layer="input_mnist_input" --output_layer="k2tfout_0" --initial_activation="mnist_1000.pb"
+
+*/
+
 int main(int argc, char* argv[])
 {
-    std::string graph = "output_graph.pb";
-    std::string input_layer_x = "x_input";
-    std::string input_layer_y = "y_input";
-    std::string output_layer_z = "z_out";
-    std::string output_layer_oz = "oz_out";
+    std::string graph = "graph.pb";
+    std::string input_layer = "input_layer";
+    std::string output_layer = "output_layer";
+    std::string initial_activation = "initial_activation.pb";
     std::string root_dir = ".";
     std::vector<tensorflow::Flag> flag_list = {
-        tensorflow::Flag("graph", &graph, "graph to be executed"),
-        tensorflow::Flag("input_layer_x", &input_layer_x, "name of input layer_x"),
-        tensorflow::Flag("input_layer_y", &input_layer_y, "name of input layer_y"),
-        tensorflow::Flag("output_layer_z", &output_layer_z, "name of output layer_z"),
-        tensorflow::Flag("output_layer_oz", &output_layer_oz, "name of output layer_oz"),
+        tensorflow::Flag("graph", &graph, "path to protobuf graph to be executed"),
+        tensorflow::Flag("input_layer", &input_layer, "name of input layer"),
+        tensorflow::Flag("output_layer", &output_layer, "name of output layer"),
+        tensorflow::Flag("initial_activation", &initial_activation, "initial tested activation"),
         tensorflow::Flag("root_dir", &root_dir, "root_dir"),
     };
     std::string usage = tensorflow::Flags::Usage(argv[0], flag_list);
@@ -59,33 +65,54 @@ int main(int argc, char* argv[])
 
     std::string graph_path = tensorflow::io::JoinPath(root_dir, graph);
     GraphManager gm(graph_path);
-    std::string x_path = tensorflow::io::JoinPath(root_dir, "x.pb");
-    std::string y_path = tensorflow::io::JoinPath(root_dir, "y.pb");
-    auto x = GraphManager::ReadBinaryTensorProto(x_path);
-    auto y = GraphManager::ReadBinaryTensorProto(y_path);
+    if(!gm.ok())
+    {
+        LOG(ERROR) << "Error during construction";
+        exit(1);
+    }
+    std::string initial_activation_path = 
+        tensorflow::io::JoinPath(root_dir, initial_activation);
+    auto init_act_tensor_status_pair = 
+        GraphManager::ReadBinaryTensorProto(initial_activation_path);
+    if(!init_act_tensor_status_pair.first)
+    {
+        LOG(ERROR) 
+            << "Could not read initial activation protobuf: " 
+            << initial_activation_path;
+        exit(1);
+    }
+    auto init_act_tensor = init_act_tensor_status_pair.second;
     auto retFeedDict = [&]()
         ->std::vector<std::pair<std::string, tensorflow::Tensor>>
     {
-        return {{input_layer_x, x}, {input_layer_y, y}};
+        return {{input_layer, init_act_tensor}};
     };
     auto getRetVal = [](std::vector<tensorflow::Tensor> const& outs)
     {
-        std::vector<float> ret;
+        std::vector<std::vector<float>> ret;
         for(auto&& out : outs)
         {
-            ret.push_back(out.flat<float>()(0));
+            std::vector<float> tmp;
+            auto flat = out.flat<float>();
+            for(auto i = 0u; i < flat.size(); ++i)
+                tmp.push_back(flat(i));
+            ret.push_back(tmp);
         }
         return ret;
     };
 
-    auto results = gm.feedThroughModel(retFeedDict, getRetVal, {output_layer_z, output_layer_oz});
+    auto results = gm.feedThroughModel(retFeedDict, getRetVal, {output_layer});
+    if(!gm.ok())
+    {
+        LOG(ERROR) << "Error while feeding through model";
+        exit(1);
+    }
     for(auto&& res : results)
     {
-        std::cout << res << " ";
+        for(auto&& elem : res)
+            std::cout << elem << " ";
+        std::cout << "\n";
     }
-    std::cout << "\n";
     return 0;
 }
-
-
 
