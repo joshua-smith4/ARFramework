@@ -113,6 +113,31 @@ int main(int argc, char* argv[])
             std::cout << elem << " ";
         std::cout << "\n";
     }
+
+    auto in_tensor = tensorflow::Tensor(tensorflow::DT_FLOAT, tensorflow::TensorShape({1,28,28,1}));
+    auto in_tensor_flat = in_tensor.shaped<float,2>({28,28});
+    in_tensor_flat(0,0) = (float)20.0;
+    auto in_tensor_copy = in_tensor.flat<float>();
+    for(auto i = 0u; i < 5u; ++i)
+        std::cout << in_tensor_copy(i) << " ";
+    std::cout << "\n";
+    auto ret2FeedDict = [&]()
+        ->std::vector<std::pair<std::string, tensorflow::Tensor>>
+    {
+        return {{input_layer, in_tensor}};
+    };
+    auto results2 = gm.feedThroughModel(ret2FeedDict, getRetVal, {output_layer});
+    if(!gm.ok())
+    {
+        LOG(ERROR) << "Error while feeding through model for second time";
+        exit(1);
+    }
+    for(auto&& res : results2)
+    {
+        for(auto&& elem : res)
+            std::cout << elem << " ";
+        std::cout << "\n";
+    }
     return 0;
 }
 
