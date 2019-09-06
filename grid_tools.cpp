@@ -14,12 +14,14 @@ bool grid::isValidRegion(grid::region const & r)
     return true;
 }
 
-grid::VolumeThresholdFilterStrategy::VolumeThresholdFilterStrategy(grid::numeric_type_t t)
+grid::VolumeThresholdFilterStrategy::VolumeThresholdFilterStrategy(
+        grid::numeric_type_t t)
     : threshold(t)
 {
 }
 
-bool grid::VolumeThresholdFilterStrategy::operator()(grid::region const& r)
+bool 
+grid::VolumeThresholdFilterStrategy::operator()(grid::region const& r)
 {
     auto volume = std::accumulate(r.begin(), r.end(), static_cast<grid::numeric_type_t>(1.0), 
         [](grid::numeric_type_t acc, std::pair<grid::numeric_type_t,grid::numeric_type_t> const& elem)
@@ -29,7 +31,8 @@ bool grid::VolumeThresholdFilterStrategy::operator()(grid::region const& r)
     return volume < threshold;
 }
 
-grid::abstraction_strategy_return_t centralPointRegionAbstraction(grid::region const& r)
+grid::abstraction_strategy_return_t 
+centralPointRegionAbstraction(grid::region const& r)
 {
     grid::point p(r.size());
     for(auto i = 0u; i < r.size(); ++i)
@@ -39,8 +42,10 @@ grid::abstraction_strategy_return_t centralPointRegionAbstraction(grid::region c
     return {p};
 }
 
-grid::AllValidDiscretizedPointsAbstraction::AllValidDiscretizedPointsAbstraction(grid::point vp, grid::point gran)
-    : knownValidPoint(vp), granularity(gran)
+grid::AllValidDiscretizedPointsAbstraction::AllValidDiscretizedPointsAbstraction(
+        grid::point vp, 
+        grid::point gran)
+    : knownValidPoint(vp), granularity(std::abs(gran))
 {
 }
 
@@ -91,7 +96,8 @@ grid::AllValidDiscretizedPointsAbstraction::findValidPointInRegion(
     return {true, retVal};
 }
 
-void grid::AllValidDiscretizedPointsAbstraction::enumerateAllPoints(
+bool 
+grid::AllValidDiscretizedPointsAbstraction::enumerateAllPoints(
         grid::abstraction_strategy_return_t& s, 
         grid::point const& p, 
         std::size_t curIndex,
@@ -108,7 +114,8 @@ void grid::AllValidDiscretizedPointsAbstraction::enumerateAllPoints(
     return false;
 }
 
-std::vector<std::size_t> maxAverageDimSelection(grid::region const& r, std::size_t numDims)
+std::vector<std::size_t> 
+maxAverageDimSelection(grid::region const& r, std::size_t numDims)
 {
     if(numDims > r.size()) throw std::domain_error("Number of selected dims must be less than or equal to the number of dimensions of the input");
     auto centralPoint = centralPointRegionAbstraction(r);
