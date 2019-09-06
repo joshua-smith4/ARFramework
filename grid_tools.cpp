@@ -1,6 +1,7 @@
 #include <exception>
 #include <stdexcept>
 #include <numeric>
+#include <cmath>
 
 #include "grid_tools.hpp"
 
@@ -28,7 +29,7 @@ bool grid::VolumeThresholdFilterStrategy::operator()(grid::region const& r)
     return volume < threshold;
 }
 
-std::set<grid::point> centralPointRegionAbstraction(grid::region const& r)
+grid::abstraction_strategy_return_t centralPointRegionAbstraction(grid::region const& r)
 {
     grid::point p(r.size());
     for(auto i = 0u; i < r.size(); ++i)
@@ -36,6 +37,73 @@ std::set<grid::point> centralPointRegionAbstraction(grid::region const& r)
         p[i] = (range.first + range.second) / static_cast<grid::numeric_type_t>(2.0);
     }
     return {p};
+}
+
+grid::AllValidDiscretizedPointsAbstraction::AllValidDiscretizedPointsAbstraction(grid::point vp, grid::point gran)
+    : knownValidPoint(vp), granularity(gran)
+{
+}
+
+grid::abstraction_strategy_return_t 
+grid::AllValidDiscretizedPointsAbstraction::operator()(
+        grid::region const& r)
+{
+    auto validPoint = findValidPointInRegion(r);
+    if(!validPoint.first) return {};
+    grid::abstraction_strategy_return_t retVal;
+    enumerateAllPoints(retVal, validPoint.second);
+    return retVal;
+}
+
+unsigned long long 
+grid::AllValidDiscretizedPointsAbstraction::getNumberValidPoints(
+        grid::region const& r)
+{
+    auto validPointInRegion = findValidPointInRegion(r);
+    if(!validPointInRegion.first) return 0ull;
+    auto retVal = 1ull;
+    for(auto i = 0u; i < r.size(); ++i)
+    {
+        if(r[i].first == r[i].second) continue;
+        auto numPointsInDim =  
+            static_cast<unsigned long long>(
+                    ceil((r[i].second - validPointInRegion.second[i])
+                    / granularity[i]));
+        retVal *= numPointsInDim;
+    }
+    return retVal;
+}
+
+std::pair<bool, grid::point> 
+grid::AllValidDiscretizedPointsAbstraction::findValidPointInRegion(
+        grid::region const& r)
+{
+    grid::point retVal(r.size());
+    for(auto i = 0u; i < r.size(); ++i)
+    {
+        auto multiplier = 
+            ceil((r[i].first - knownValidPoint[i]) / granularity[i]);
+        auto value = knownValidPoint[i] + multiplier*granularity[i]; 
+        if(value >= r[i].second && value != r[i].first)
+            return {false, {}};
+        retVal[i] = value;
+    }
+    return {true, retVal};
+}
+
+void grid::AllValidDiscretizedPointsAbstraction::enumerateAllPoints(
+        grid::abstraction_strategy_return_t& s, 
+        grid::point& p, 
+        std::size_t curIndex,
+        grid::region const& r)
+{
+    if(curIndex >= r.size() || p[curIndex] >= r[curIndex].second) return;
+    std::fill_n(std::inserter(s, s.end()), 1, p);
+    while(p[curIndex] < r[curIndex].second)
+    {
+        p[curIndex] += granularity[curIndex];
+        enumerateAllPoints(s, p, curIndex+1, r);
+    }
 }
 
 std::vector<std::size_t> maxAverageDimSelection(grid::region const& r, std::size_t numDims)
@@ -101,7 +169,7 @@ bool operator<(grid::point const& p, grid::region const& r)
     for(auto i = 0u; i < p.size(); ++i)
     {
         if(p[i] < r[i].first) return true;
-        if(p[i] > r[i].second) return false;
+        if(p[i] >= r[i].second) return false;
     }
     return false;
 }
@@ -112,7 +180,7 @@ bool operator<(grid::region const& r, grid::point const& p)
         throw std::domain_error("Point and region must have the same dimensionality.");
     for(auto i = 0u; i < p.size(); ++i)
     {
-        if(r[i].second < p[i]) return true;
+        if(r[i].second <= p[i]) return true;
         if(r[i].first > p[i]) return false;
     }
     return false;

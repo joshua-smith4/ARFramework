@@ -9,13 +9,18 @@
 
 namespace grid
 {
-    using numeric_type_t = double;
+    using numeric_type_t = long double;
     using region = std::vector<std::pair<numeric_type_t, numeric_type_t>>;
     using point = std::vector<numeric_type_t>;
 
-    using region_refinement_strategy_t = std::function<std::set<region>(region const&, std::vector<numeric_type_t> const&)>;
+
+    using refinement_strategy_return_t = std::set<region>;
+    using region_refinement_strategy_t = 
+        std::function<refinement_strategy_return_t(region const&)>;
     using region_filter_strategy_t = std::function<bool(region const&)>;
-    using region_abstraction_strategy_t = std::function<std::set<point>(region const&)>;
+    using abstraction_strategy_return_t = std::set<point>;
+    using region_abstraction_strategy_t = 
+        std::function<abstraction_strategy_return_t(region const&)>;
     using dimension_selection_strategy_t = std::function<std::vector<std::size_t>(region const&, std::size_t)>;
     using norm_function_type_t = std::function<double(point const&, point const&)>;
 
@@ -28,7 +33,25 @@ namespace grid
         bool operator()(region const&);
     };
 
-    std::set<grid::point> centralPointRegionAbstraction(region const&);
+    abstraction_strategy_return_t 
+    centralPointRegionAbstraction(region const&);
+
+    struct AllValidDiscretizedPointsAbstraction
+    {
+        AllValidDiscretizedPointsAbstraction();
+        grid::point knownValidPoint;
+        grid::point granularity;
+        abstraction_strategy_return_t operator()(grid::region const&);
+        unsigned long long getNumberValidPoints(grid::region const&);
+        std::pair<bool, grid::point> findValidPointInRegion(
+                grid::region const&);
+    private:
+        void enumerateAllPoints(
+                abstraction_strategy_return_t&, 
+                grid::point&,
+                std::size_t,
+                grid::region const&);
+    };
 
     std::vector<std::size_t> maxAverageDimSelection(region const&, std::size_t);
 
@@ -45,7 +68,7 @@ namespace grid
     struct IntelliFGSMRegionAbstraction
     {
         IntelliFGSMRegionAbstraction(std::size_t, std::function<point(point const&)>&&);
-        std::set<point> operator()(region const&);
+        abstraction_strategy_return_t operator()(region const&);
         std::size_t maxPoints;
         std::function<point(point const&)> gradient;
     };
