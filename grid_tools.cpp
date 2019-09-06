@@ -93,17 +93,19 @@ grid::AllValidDiscretizedPointsAbstraction::findValidPointInRegion(
 
 void grid::AllValidDiscretizedPointsAbstraction::enumerateAllPoints(
         grid::abstraction_strategy_return_t& s, 
-        grid::point& p, 
+        grid::point const& p, 
         std::size_t curIndex,
         grid::region const& r)
 {
-    if(curIndex >= r.size() || p[curIndex] >= r[curIndex].second) return;
-    std::fill_n(std::inserter(s, s.end()), 1, p);
-    while(p[curIndex] < r[curIndex].second)
+    if(curIndex >= r.size()) return true;
+    auto newp = p;
+    while(newp[curIndex] < r[curIndex].second)
     {
-        p[curIndex] += granularity[curIndex];
-        enumerateAllPoints(s, p, curIndex+1, r);
+        if(enumerateAllPoints(s, newp, curIndex+1, r, granularity))
+            std::fill_n(std::inserter(s, s.end()), 1, newp);
+        newp[curIndex] += granularity[curIndex];
     }
+    return false;
 }
 
 std::vector<std::size_t> maxAverageDimSelection(grid::region const& r, std::size_t numDims)
