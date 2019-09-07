@@ -19,7 +19,7 @@ namespace grid
     // underlying container contains a tuple of arguments
     // first: lower bound (inclusive)
     // second: upper bound (exclusive)
-    using region = std::vector<>;
+    using region = std::vector<region_element>;
 
     // container representing a point in the input space
     using point = std::vector<numeric_type_t>;
@@ -30,7 +30,7 @@ namespace grid
     using region_refinement_strategy_t = 
         std::function<refinement_strategy_return_t(region const&)>;
 
-    // returns true if a region should be kept
+    // returns true if a region should be removed
     using region_filter_strategy_t = std::function<bool(region const&)>;
 
     using abstraction_strategy_return_t = std::vector<point>;
@@ -56,7 +56,10 @@ namespace grid
     // think about making this a pass by reference to avoid
     // excessive copying
     point 
-    enforceSnapDiscreteGrid(point const&, point const&, point const&);
+    enforceSnapDiscreteGrid(
+            point const& /* p */, 
+            point const& /* referencePoint */, 
+            point const& /* granularity */);
 
     // definition of valid region
     bool isValidRegion(region const&);
@@ -65,7 +68,7 @@ namespace grid
     // compared to a threshold
     struct VolumeThresholdFilterStrategy
     {
-        explicit VolumeThresholdFilterStrategy(double);
+        explicit VolumeThresholdFilterStrategy(numeric_type_t);
         const numeric_type_t threshold;
         bool operator()(region const&);
     };
@@ -80,15 +83,17 @@ namespace grid
     // (discrete units of each dimension)
     struct AllValidDiscretizedPointsAbstraction
     {
-        AllValidDiscretizedPointsAbstraction();
+        AllValidDiscretizedPointsAbstraction(
+                point /* knownValidPoint */, 
+                point /* granularity */);
         abstraction_strategy_return_t operator()(grid::region const&);
         unsigned long long getNumberValidPoints(grid::region const&);
         std::pair<bool, grid::point> findValidPointInRegion(
                 grid::region const&);
     private:
-        void enumerateAllPoints(
+        bool enumerateAllPoints(
                 abstraction_strategy_return_t&, 
-                grid::point&,
+                grid::point const&,
                 std::size_t,
                 grid::region const&);
         grid::point knownValidPoint;
@@ -120,10 +125,11 @@ namespace grid
     {
         IntelliFGSMRegionAbstraction(
                 std::size_t, 
-                std::function<point(point const&)>&&
+                std::function<point(point const&)>&&,
                 std::vector<point>,
                 norm_function_type_t&&,
-                std::size_t);
+                std::size_t,
+                double);
         abstraction_strategy_return_t operator()(region const&);
     private:
         std::size_t maxPoints;

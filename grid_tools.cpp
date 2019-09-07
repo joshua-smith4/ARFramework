@@ -1,3 +1,4 @@
+#include <iostream>
 #include <exception>
 #include <stdexcept>
 #include <numeric>
@@ -47,12 +48,14 @@ grid::VolumeThresholdFilterStrategy::operator()(grid::region const& r)
 }
 
 grid::abstraction_strategy_return_t 
-centralPointRegionAbstraction(grid::region const& r)
+grid::centralPointRegionAbstraction(grid::region const& r)
 {
     grid::point p(r.size());
     for(auto i = 0u; i < r.size(); ++i)
     {
-        p[i] = (range.first + range.second) / static_cast<grid::numeric_type_t>(2.0);
+        p[i] = 
+            (r[i].first + r[i].second) 
+            / static_cast<grid::numeric_type_t>(2.0);
     }
     return {p};
 }
@@ -71,7 +74,7 @@ grid::AllValidDiscretizedPointsAbstraction::operator()(
     auto validPoint = findValidPointInRegion(r);
     if(!validPoint.first) return {};
     grid::abstraction_strategy_return_t retVal;
-    enumerateAllPoints(retVal, validPoint.second);
+    enumerateAllPoints(retVal, validPoint.second, 0u, r);
     return retVal;
 }
 
@@ -122,7 +125,7 @@ grid::AllValidDiscretizedPointsAbstraction::enumerateAllPoints(
     auto newp = p;
     while(newp[curIndex] < r[curIndex].second)
     {
-        if(enumerateAllPoints(s, newp, curIndex+1, r, granularity))
+        if(enumerateAllPoints(s, newp, curIndex+1, r))
             std::fill_n(std::inserter(s, s.end()), 1, newp);
         newp[curIndex] += granularity[curIndex];
     }
@@ -130,20 +133,20 @@ grid::AllValidDiscretizedPointsAbstraction::enumerateAllPoints(
 }
 
 std::vector<std::size_t> 
-maxAverageDimSelection(grid::region const& r, std::size_t numDims)
+grid::maxAverageDimSelection(grid::region const& r, std::size_t numDims)
 {
     if(numDims > r.size()) 
         return {};
-    auto centralPoint = centralPointRegionAbstraction(r);
+    auto centralPoint = grid::centralPointRegionAbstraction(r);
     if(centralPoint.empty()) return {};
     auto p = *centralPoint.begin();
-    auto avg = std::reduce(p.begin(), p.end(), static_cast<grid::numeric_type_t>(0))
+    auto avg = std::accumulate(p.begin(), p.end(), static_cast<grid::numeric_type_t>(0))
         / static_cast<grid::numeric_type_t>(p.size());
-
+    std::cout << "average " << avg << "\n";
     grid::point dif(p.size());
     for(auto i = 0u; i < p.size(); ++i)
     {
-        dif[i] = std::abs(avg - elem);
+        dif[i] = std::abs(avg - p[i]);
     }
     auto indices = getSortedIndices(dif, false /* descending */);
     return {indices.begin(), indices.begin() + numDims};
@@ -197,7 +200,7 @@ grid::IntelliFGSMRegionAbstraction::IntelliFGSMRegionAbstraction(
         std::size_t mp, 
         std::function<grid::point(grid::point const&)>&& grad,
         std::vector<grid::point> class_averages,
-        norm_funciton_type_t&& norm_func,
+        norm_function_type_t&& norm_func,
         std::size_t orig_class,
         double pFGSM)
     : maxPoints(mp), gradient(grad), 
@@ -243,7 +246,7 @@ grid::IntelliFGSMRegionAbstraction::operator()(grid::region const& r)
     auto dist_e2 = 
         std::uniform_real_distribution<long double>(
                 e2_lowerbound, e2_upperbound);
-    auto dist_R = std::uniform_int_distribution(0,1);
+    auto dist_R = std::uniform_int_distribution<int>(0,1);
 
     grid::abstraction_strategy_return_t retVal;
     retVal.reserve(maxPoints);
