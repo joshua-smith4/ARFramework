@@ -217,12 +217,54 @@ grid::IntelliFGSMRegionAbstraction::operator()(grid::region const& r)
     auto numDimsFGSM = 
         static_cast<unsigned>(
                 percentFGSM * static_cast<double>(r.size()));
-    grid::point m(p.size(), 0.0);
+    grid::point M(p.size(), 0.0);
+    grid::point Mnot(p.size(), 1.0);
     for(auto i = 0u; i < numDimsFGSM; ++i)
     {
-        m[dims[i]] = 1.0;
+        M[dims[i]] = 1.0;
+        Mnot[dims[i]] = 0.0;
     }
+    auto min_dimension = 
+        std::min_element(r.begin(), r.end(),
+                [](grid::region_element const& a,
+                    grid::region_element const& b)
+                { return a.second - a.first < b.second - b.first; });
+    auto max_radius = 
+        (min_dimension->second - min_dimension->first) / (long double)2.0;
+    auto e2_lowerbound = (long double)1.00001;
+    auto e2_upperbound = 1.1;
+    auto e1_lowerbound = (long double)0.00001;
+    auto e1_upperbound = max_radius / ((long double)1.0 + e2_upperbound);
 
+    std::default_random_engine rand_gen;
+    auto dist_e1 = 
+        std::uniform_real_distribution<long double>(
+                e1_lowerbound, e1_upperbound);
+    auto dist_e2 = 
+        std::uniform_real_distribution<long double>(
+                e2_lowerbound, e2_upperbound);
+    auto dist_R = std::uniform_int_distribution(0,1);
+
+    grid::abstraction_strategy_return_t retVal;
+    retVal.reserve(maxPoints);
+    for(auto i = 0u; i < maxPoints; ++i)
+    {
+        auto e1 = dist_e1(rand_gen); 
+        auto e2 = dist_e2(rand_gen);
+        grid::point R(r.size());
+        for(auto&& elem : R)
+        {
+            elem = dist_R(rand_gen);
+            if(elem != 1) elem = -1;
+        }
+        retVal.emplace_back(
+                constVecMult(
+                    e1, 
+                    elementWiseMult(grad_sign,M) + constVecMult(
+                        e2, 
+                        elementWiseMult(R,Mnot))));
+    }
+    return retVal;
 }
 
 bool operator<(grid::point const& p, grid::region const& r)
@@ -290,6 +332,14 @@ grid::point operator+(grid::point const& a, grid::point const& b)
     {
         retVal[i] = a[i] + b[i];
     }
+    return retVal;
+}
+
+grid::point elementWiseMult(grid::point const& a, grid::point const& b)
+{
+    grid::point retVal(a.size());
+    for(auto i = 0u; i < a.size(); ++i)
+        retVal[i] = a[i] * b[i];
     return retVal;
 }
 

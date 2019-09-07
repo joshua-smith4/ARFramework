@@ -1,6 +1,7 @@
 #ifndef GRID_TOOLS_INCLUDED
 #define GRID_TOOLS_INCLUDED
 
+#include <random>
 #include <vector>
 #include <set>
 #include <utility>
@@ -13,11 +14,12 @@ namespace grid
     // long double for highest precision
     using numeric_type_t = long double;
 
+    using region_element = std::pair<numeric_type_t, numeric_type_t>;
     // hyperrectangular region where each element of the
     // underlying container contains a tuple of arguments
     // first: lower bound (inclusive)
     // second: upper bound (exclusive)
-    using region = std::vector<std::pair<numeric_type_t, numeric_type_t>>;
+    using region = std::vector<>;
 
     // container representing a point in the input space
     using point = std::vector<numeric_type_t>;
@@ -112,6 +114,8 @@ namespace grid
         std::size_t orig_class;
     };
 
+    point sign(point const&);
+
     struct IntelliFGSMRegionAbstraction
     {
         IntelliFGSMRegionAbstraction(
@@ -125,7 +129,7 @@ namespace grid
         std::size_t maxPoints;
         std::function<point(point const&)> gradient;
         IntellifeatureDimSelection intellifeature;
-        float percentFGSM;
+        double percentFGSM;
     };
 }
 
@@ -136,6 +140,16 @@ bool operator<(grid::point const&, grid::point const&);
 
 grid::point operator-(grid::point const&, grid::point const&);
 grid::point operator+(grid::point const&, grid::point const&);
+grid::point elementWiseMult(grid::point const&, grid::point const&);
+
+template <class T>
+grid::point constVecMult(T const& t, grid::point const& p)
+{
+    grid::point ret(p.size());
+    for(auto i = 0u; i < p.size(); ++i)
+        ret[i] = t * p[i];
+    return ret;
+}
 
 namespace std
 {
