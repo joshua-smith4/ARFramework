@@ -52,11 +52,36 @@ int main()
 
     auto dims_mad = grid::maxAverageDimSelection(reg, 3);
     assert(dims_mad.size() == 3);
-    for(auto&& elem : dims_mad)
-        std::cout << elem << " ";
-    std::cout << "\n";
     assert(dims_mad[0] == 0 && dims_mad[1] == 1 && dims_mad[2] == 2);
 
+    auto reg_intelli = grid::region({{0.8,1},{-1,-0.8},{-1,-0.8}});
+    auto orig_class = 3;
+    auto averages = std::vector<grid::point>({
+            {1, 1, 1},
+            {1, 1,-1},
+            {1,-1, 1},
+            {1,-1,-1},
+            {-1,1, 1},
+            {-1,1,-1},
+            {-1,-1,1},
+            {-1,-1,-1}});
+    auto intellifeature = grid::IntellifeatureDimSelection(
+            averages, grid::l2norm, orig_class);
+    auto dims_intelli = intellifeature(reg_intelli, reg_intelli.size());
+    assert(dims_intelli.size() == reg_intelli.size());
+    
+    auto sign_test_point = grid::point({-0.001, 0, 0.001, 2, -2});
+    auto sign_res = grid::sign(sign_test_point);
+    for(auto&& elem : sign_res)
+        assert(std::abs(elem) <= 1);
+    assert(
+            sign_res[0] == -1 && 
+            sign_res[1] == 0 && 
+            sign_res[2] == 1 &&
+            sign_res[3] == 1 &&
+            sign_res[4] == -1);
+    
+    // TODO: test IntelliFGSM with real model
     return 0;
 }
 

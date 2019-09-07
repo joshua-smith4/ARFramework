@@ -104,6 +104,8 @@ namespace grid
     // the DLV paper (Xiaowei et. al.)
     std::vector<std::size_t> maxAverageDimSelection(region const&, std::size_t);
 
+    numeric_type_t l2norm(point const&);
+
     // dimension selection algorithm defined in
     // IntelliFeatures paper (Joshua Smith et. al.)
     struct IntellifeatureDimSelection

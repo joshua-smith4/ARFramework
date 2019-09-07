@@ -142,7 +142,6 @@ grid::maxAverageDimSelection(grid::region const& r, std::size_t numDims)
     auto p = *centralPoint.begin();
     auto avg = std::accumulate(p.begin(), p.end(), static_cast<grid::numeric_type_t>(0))
         / static_cast<grid::numeric_type_t>(p.size());
-    std::cout << "average " << avg << "\n";
     grid::point dif(p.size());
     for(auto i = 0u; i < p.size(); ++i)
     {
@@ -150,6 +149,14 @@ grid::maxAverageDimSelection(grid::region const& r, std::size_t numDims)
     }
     auto indices = getSortedIndices(dif, false /* descending */);
     return {indices.begin(), indices.begin() + numDims};
+}
+
+long double grid::l2norm(grid::point const& p)
+{
+    grid::numeric_type_t squared_sum = 0;
+    for(auto&& elem : p)
+        squared_sum += elem*elem;
+    return sqrt(squared_sum);
 }
 
 grid::IntellifeatureDimSelection::IntellifeatureDimSelection(
@@ -188,10 +195,10 @@ grid::IntellifeatureDimSelection::operator()(grid::region const& r, std::size_t 
 grid::point grid::sign(grid::point const& p)
 {
     grid::point ret(p.size(), 0.0);
-    for(auto&& elem : ret)
+    for(auto i = 0u; i < p.size(); ++i)
     {
-        if(elem < 0) elem = -1;
-        else if(elem > 0) elem = 1;
+        if(p[i] < 0) ret[i] = -1;
+        else if(p[i] > 0) ret[i] = 1;
     }
     return ret;
 }
