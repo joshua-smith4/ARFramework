@@ -9,23 +9,58 @@
 
 namespace grid
 {
+    // numeric type used to represent regions and points
+    // long double for highest precision
     using numeric_type_t = long double;
+
+    // hyperrectangular region where each element of the
+    // underlying container contains a tuple of arguments
+    // first: lower bound (inclusive)
+    // second: upper bound (exclusive)
     using region = std::vector<std::pair<numeric_type_t, numeric_type_t>>;
+
+    // container representing a point in the input space
     using point = std::vector<numeric_type_t>;
 
 
-    using refinement_strategy_return_t = std::set<region>;
+    using refinement_strategy_return_t = std::vector<region>; 
+    // takes a region and returns a partition of that region
     using region_refinement_strategy_t = 
         std::function<refinement_strategy_return_t(region const&)>;
+
+    // returns true if a region should be kept
     using region_filter_strategy_t = std::function<bool(region const&)>;
-    using abstraction_strategy_return_t = std::set<point>;
+
+    using abstraction_strategy_return_t = std::vector<point>;
+    // abstracts a region to a set of discrete points
     using region_abstraction_strategy_t = 
         std::function<abstraction_strategy_return_t(region const&)>;
-    using dimension_selection_strategy_t = std::function<std::vector<std::size_t>(region const&, std::size_t)>;
-    using norm_function_type_t = std::function<double(point const&, point const&)>;
 
+    // selects a set of dimensions (vector of indices) that
+    // are more important or useful than others based on
+    // a heuristic
+    using dimension_selection_strategy_t = 
+        std::function<std::vector<std::size_t>(region const&, std::size_t)>;
+
+    // function used to calculate the norm of a point
+    using norm_function_type_t = 
+        std::function<long double(point const&)>;
+
+    // takes a point and enforces alignment to a discrete
+    // grid
+    using discrete_enforcement_function_type_t = 
+        std::function<point(point const&, point const&, point const&)>;
+
+    // think about making this a pass by reference to avoid
+    // excessive copying
+    point 
+    enforceSnapDiscreteGrid(point const&, point const&, point const&);
+
+    // definition of valid region
     bool isValidRegion(region const&);
 
+    // filter strategy based on the 'volume' of a region
+    // compared to a threshold
     struct VolumeThresholdFilterStrategy
     {
         explicit VolumeThresholdFilterStrategy(double);
@@ -33,14 +68,17 @@ namespace grid
         bool operator()(region const&);
     };
 
+    // abstracts a region to the central point
     abstraction_strategy_return_t 
     centralPointRegionAbstraction(region const&);
 
+    // abstracts a region to a covering set of discrete
+    // points aligned with a grid defined by a 
+    // reference point and a granularity
+    // (discrete units of each dimension)
     struct AllValidDiscretizedPointsAbstraction
     {
         AllValidDiscretizedPointsAbstraction();
-        grid::point knownValidPoint;
-        grid::point granularity;
         abstraction_strategy_return_t operator()(grid::region const&);
         unsigned long long getNumberValidPoints(grid::region const&);
         std::pair<bool, grid::point> findValidPointInRegion(
@@ -51,13 +89,22 @@ namespace grid
                 grid::point&,
                 std::size_t,
                 grid::region const&);
+        grid::point knownValidPoint;
+        grid::point granularity;
     };
 
+    // dimension selection algorithm outlined in
+    // the DLV paper (Xiaowei et. al.)
     std::vector<std::size_t> maxAverageDimSelection(region const&, std::size_t);
 
+    // dimension selection algorithm defined in
+    // IntelliFeatures paper (Joshua Smith et. al.)
     struct IntellifeatureDimSelection
     {
-        IntellifeatureDimSelection(std::vector<point> const&, norm_function_type_t, std::size_t);
+        IntellifeatureDimSelection(
+                std::vector<point> const&, 
+                norm_function_type_t, 
+                std::size_t);
         std::vector<std::size_t> operator()(region const&, std::size_t);
         const std::vector<point> averages;
     private:
@@ -67,10 +114,18 @@ namespace grid
 
     struct IntelliFGSMRegionAbstraction
     {
-        IntelliFGSMRegionAbstraction(std::size_t, std::function<point(point const&)>&&);
+        IntelliFGSMRegionAbstraction(
+                std::size_t, 
+                std::function<point(point const&)>&&
+                std::vector<point>,
+                norm_function_type_t&&,
+                std::size_t);
         abstraction_strategy_return_t operator()(region const&);
+    private:
         std::size_t maxPoints;
         std::function<point(point const&)> gradient;
+        IntellifeatureDimSelection intellifeature;
+        float percentFGSM;
     };
 }
 

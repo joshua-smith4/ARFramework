@@ -5,6 +5,21 @@
 
 #include "grid_tools.hpp"
 
+grid::point grid::enforceSnapDiscreteGrid(
+        grid::point const& p, 
+        grid::point const& referencePoint, 
+        grid::point const& granularity)
+{
+    grid::point retVal(p.size());
+    for(auto i = 0u; i < retVal.size(); ++i)
+    {
+        auto multiplier = 
+            round((p[i] - referencePoint[i]) / granularity[i]);
+        retVal[i] = referencePoint[i] + multiplier*granularity[i];
+    }
+    return retVal;
+}
+
 bool grid::isValidRegion(grid::region const & r)
 {
     for(auto&& range : r)
@@ -117,7 +132,8 @@ grid::AllValidDiscretizedPointsAbstraction::enumerateAllPoints(
 std::vector<std::size_t> 
 maxAverageDimSelection(grid::region const& r, std::size_t numDims)
 {
-    if(numDims > r.size()) throw std::domain_error("Number of selected dims must be less than or equal to the number of dimensions of the input");
+    if(numDims > r.size()) 
+        return {};
     auto centralPoint = centralPointRegionAbstraction(r);
     if(centralPoint.empty()) return {};
     auto p = *centralPoint.begin();
@@ -145,7 +161,7 @@ std::vector<std::size_t>
 grid::IntellifeatureDimSelection::operator()(grid::region const& r, std::size_t numDims)
 {
     if(numDims > r.size())
-        throw std::domain_error("Number of selected dimensions needs to match the dimensionality of the input");
+        return {};
     // get central point of region
     auto centralPointSet = grid::centralPointRegionAbstraction(r);
     if(centralPointSet.empty()) return {};
@@ -156,7 +172,7 @@ grid::IntellifeatureDimSelection::operator()(grid::region const& r, std::size_t 
     {
         // skip the original class
         if(i == orig_class) continue;
-        norms[i] = norm_func(averages[i], p);
+        norms[i] = norm_func(averages[i] - p);
     }
     auto indices = getSortedIndices(norms);
     std::remove(indices.begin(), indices.end(), orig_class);
@@ -166,9 +182,47 @@ grid::IntellifeatureDimSelection::operator()(grid::region const& r, std::size_t 
     return {indices.begin(), indices.begin() + numDims};
 }
 
-grid::IntelliFGSMRegionAbstraction::IntelliFGSMRegionAbstraction()
-    : maxPoints(), gradient()
+grid::point grid::sign(grid::point const& p)
 {
+    grid::point ret(p.size(), 0.0);
+    for(auto&& elem : ret)
+    {
+        if(elem < 0) elem = -1;
+        else if(elem > 0) elem = 1;
+    }
+    return ret;
+}
+
+grid::IntelliFGSMRegionAbstraction::IntelliFGSMRegionAbstraction(
+        std::size_t mp, 
+        std::function<grid::point(grid::point const&)>&& grad,
+        std::vector<grid::point> class_averages,
+        norm_funciton_type_t&& norm_func,
+        std::size_t orig_class,
+        double pFGSM)
+    : maxPoints(mp), gradient(grad), 
+      intellifeature(class_averages, norm_func, orig_class),
+      percentFGSM(std::abs(pFGSM) > 1 ? 1 : std::abs(pFGSM))
+{
+}
+
+grid::abstraction_strategy_return_t
+grid::IntelliFGSMRegionAbstraction::operator()(grid::region const& r)
+{
+    auto centralPointSet = grid::centralPointRegionAbstraction(r);
+    if(centralPointSet.empty()) return {};
+    auto p = *centralPointSet.begin();
+    auto grad_sign = grid::sign(gradient(p));
+    auto dims = intellifeature(r, r.size());
+    auto numDimsFGSM = 
+        static_cast<unsigned>(
+                percentFGSM * static_cast<double>(r.size()));
+    grid::point m(p.size(), 0.0);
+    for(auto i = 0u; i < numDimsFGSM; ++i)
+    {
+        m[dims[i]] = 1.0;
+    }
+
 }
 
 bool operator<(grid::point const& p, grid::region const& r)
