@@ -81,6 +81,15 @@ int main()
             sign_res[3] == 1 &&
             sign_res[4] == -1);
     
+    auto hd_refinement = grid::HierarchicalDimensionRefinementStrategy(
+            grid::maxAverageDimSelection, 4, reg.size()-1);
+    auto subregions = hd_refinement(reg);
+    auto reg_volume = grid::regionVolume(reg);
+    auto subreg_volume = (long double)0;
+    for(auto&& subregion : subregions)
+        subreg_volume += grid::regionVolume(subregion);
+    assert(subreg_volume == reg_volume);
+
     // TODO: test IntelliFGSM with real model
     return 0;
 }

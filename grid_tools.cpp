@@ -30,6 +30,15 @@ bool grid::isValidRegion(grid::region const & r)
     return true;
 }
 
+long double grid::regionVolume(grid::region const& r)
+{
+    return std::accumulate(r.begin(), r.end(), static_cast<long double>(1.0), 
+        [](grid::numeric_type_t acc, grid::region_element const& elem)
+            {
+                return acc*(elem.second - elem.first);
+            });
+}
+
 grid::VolumeThresholdFilterStrategy::VolumeThresholdFilterStrategy(
         grid::numeric_type_t t)
     : threshold(t)
@@ -39,11 +48,7 @@ grid::VolumeThresholdFilterStrategy::VolumeThresholdFilterStrategy(
 bool 
 grid::VolumeThresholdFilterStrategy::operator()(grid::region const& r)
 {
-    auto volume = std::accumulate(r.begin(), r.end(), static_cast<grid::numeric_type_t>(1.0), 
-        [](grid::numeric_type_t acc, std::pair<grid::numeric_type_t,grid::numeric_type_t> const& elem)
-            {
-                return acc*(elem.second - elem.first);
-            });
+    auto volume = grid::regionVolume(r);
     return volume < threshold;
 }
 
@@ -126,7 +131,7 @@ grid::AllValidDiscretizedPointsAbstraction::enumerateAllPoints(
     while(newp[curIndex] < r[curIndex].second)
     {
         if(enumerateAllPoints(s, newp, curIndex+1, r))
-            std::fill_n(std::inserter(s, s.end()), 1, newp);
+            s.push_back(newp);
         newp[curIndex] += granularity[curIndex];
     }
     return false;
@@ -203,27 +208,25 @@ grid::point grid::sign(grid::point const& p)
     return ret;
 }
 
-grid::IntelliFGSMRegionAbstraction::IntelliFGSMRegionAbstraction(
+grid::ModifiedFGSMRegionAbstraction::ModifiedFGSMRegionAbstraction(
         std::size_t mp, 
         std::function<grid::point(grid::point const&)>&& grad,
-        std::vector<grid::point> class_averages,
-        norm_function_type_t&& norm_func,
-        std::size_t orig_class,
+        grid::dimension_selection_strategy_t&& dim_sel,
         double pFGSM)
     : maxPoints(mp), gradient(grad), 
-      intellifeature(class_averages, norm_func, orig_class),
+      dim_select_strategy(dim_sel),
       percentFGSM(std::abs(pFGSM) > 1 ? 1 : std::abs(pFGSM))
 {
 }
 
 grid::abstraction_strategy_return_t
-grid::IntelliFGSMRegionAbstraction::operator()(grid::region const& r)
+grid::ModifiedFGSMRegionAbstraction::operator()(grid::region const& r)
 {
     auto centralPointSet = grid::centralPointRegionAbstraction(r);
     if(centralPointSet.empty()) return {};
     auto p = *centralPointSet.begin();
     auto grad_sign = grid::sign(gradient(p));
-    auto dims = intellifeature(r, r.size());
+    auto dims = dim_select_strategy(r, r.size());
     auto numDimsFGSM = 
         static_cast<unsigned>(
                 percentFGSM * static_cast<double>(r.size()));
@@ -275,6 +278,53 @@ grid::IntelliFGSMRegionAbstraction::operator()(grid::region const& r)
                         elementWiseMult(R,Mnot))));
     }
     return retVal;
+}
+
+grid::HierarchicalDimensionRefinementStrategy::HierarchicalDimensionRefinementStrategy(
+        grid::dimension_selection_strategy_t&& dim_select,
+        unsigned divisor,
+        unsigned ndims)
+    : dim_select_strategy(dim_select), dim_divisor(divisor), numDims(ndims)
+{
+}
+
+grid::refinement_strategy_return_t
+grid::HierarchicalDimensionRefinementStrategy::operator()(grid::region const& r)
+{
+    auto dims = dim_select_strategy(r, numDims);
+    grid::refinement_strategy_return_t retVal;
+    auto firstRegion = r;
+    for(auto i = 0u; i < dims.size(); ++i)
+    {
+        auto curIndex = dims[i];
+        auto sizeIncrement = (r[curIndex].second - r[curIndex].first)
+            / (grid::numeric_type_t)dim_divisor;
+        firstRegion[curIndex].second = firstRegion[curIndex].first + sizeIncrement;
+    }
+    enumerateAllRegions(retVal, firstRegion, 0, dims, r);
+    return retVal;
+}
+
+bool
+grid::HierarchicalDimensionRefinementStrategy::enumerateAllRegions(
+        grid::refinement_strategy_return_t& s,
+        grid::region const& r,
+        unsigned index,
+        grid::dim_selection_strategy_return_t const& selected_dims,
+        grid::region const& orig_region)
+{
+    if(index >= selected_dims.size()) return true;
+    auto newr = r;
+    auto curIndex = selected_dims[index];
+    auto diff = newr[curIndex].second - newr[curIndex].first;
+    while(newr[curIndex].second <= orig_region[curIndex].second)
+    {
+        if(enumerateAllRegions(s, newr, index+1, selected_dims, orig_region))
+            s.push_back(newr);
+        newr[curIndex].first = newr[curIndex].second;
+        newr[curIndex].second += diff;
+    }
+    return false;
 }
 
 bool operator<(grid::point const& p, grid::region const& r)

@@ -41,8 +41,9 @@ namespace grid
     // selects a set of dimensions (vector of indices) that
     // are more important or useful than others based on
     // a heuristic
+    using dim_selection_strategy_return_t = std::vector<std::size_t>;
     using dimension_selection_strategy_t = 
-        std::function<std::vector<std::size_t>(region const&, std::size_t)>;
+        std::function<dim_selection_strategy_return_t(region const&, std::size_t)>;
 
     // function used to calculate the norm of a point
     using norm_function_type_t = 
@@ -64,6 +65,7 @@ namespace grid
     // definition of valid region
     bool isValidRegion(region const&);
 
+    long double regionVolume(region const&);
     // filter strategy based on the 'volume' of a region
     // compared to a threshold
     struct VolumeThresholdFilterStrategy
@@ -123,21 +125,38 @@ namespace grid
 
     point sign(point const&);
 
-    struct IntelliFGSMRegionAbstraction
+    struct ModifiedFGSMRegionAbstraction
     {
-        IntelliFGSMRegionAbstraction(
-                std::size_t, 
-                std::function<point(point const&)>&&,
-                std::vector<point>,
-                norm_function_type_t&&,
-                std::size_t,
-                double);
+        ModifiedFGSMRegionAbstraction(
+                std::size_t /* number of points to generate */, 
+                std::function<point(point const&)>&& /* gradient */,
+                dimension_selection_strategy_t&&,
+                double /* percent of dimensions for normal FGSM */);
         abstraction_strategy_return_t operator()(region const&);
     private:
         std::size_t maxPoints;
         std::function<point(point const&)> gradient;
-        IntellifeatureDimSelection intellifeature;
+        dimension_selection_strategy_t dim_select_strategy;
         double percentFGSM;
+    };
+
+    struct HierarchicalDimensionRefinementStrategy
+    {
+        HierarchicalDimensionRefinementStrategy(
+                dimension_selection_strategy_t&&,
+                unsigned /* dimension divisor */,
+                unsigned /* number of dimensions to subdivide */);
+        refinement_strategy_return_t operator()(region const&);
+    private:
+        bool enumerateAllRegions(
+                refinement_strategy_return_t&,
+                region const&,
+                unsigned,
+                dim_selection_strategy_return_t const& /* dims */,
+                region const& orig_region);
+        dimension_selection_strategy_t dim_select_strategy;
+        unsigned dim_divisor;
+        unsigned numDims;
     };
 }
 
