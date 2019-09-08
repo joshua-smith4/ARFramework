@@ -82,7 +82,7 @@ int main()
             sign_res[4] == -1);
     
     auto hd_refinement = grid::HierarchicalDimensionRefinementStrategy(
-            grid::maxAverageDimSelection, 4, reg.size()-1);
+            grid::maxAverageDimSelection, 4, reg.size());
     auto subregions = hd_refinement(reg);
     auto reg_volume = grid::regionVolume(reg);
     auto subreg_volume = (long double)0;
