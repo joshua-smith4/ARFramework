@@ -1,7 +1,6 @@
 #include <iostream>
 #include <fstream>
 
-#include "tensorflow/core/framework/tensor.pb.h"
 #include "tensorflow/core/lib/io/path.h"
 #include "tensorflow/core/lib/strings/str_util.h"
 #include "tensorflow/core/lib/strings/stringprintf.h"
@@ -9,7 +8,9 @@
 #include "tensorflow/core/platform/logging.h"
 #include "tensorflow/core/util/command_line_flags.h"
 
+#include "tensorflow_graph_tools.hpp"
 #include "GraphManager.hpp"
+#include "grid_tools.hpp"
 
 // command
 //
@@ -26,6 +27,7 @@ int main(int argc, char* argv[])
     std::string output_layer = "output_layer";
     std::string initial_activation = "initial_activation.pb";
     std::string root_dir = ".";
+
     std::vector<tensorflow::Flag> flag_list = {
         tensorflow::Flag("graph", &graph, "path to protobuf graph to be executed"),
         tensorflow::Flag("input_layer", &input_layer, "name of input layer"),
@@ -55,6 +57,7 @@ int main(int argc, char* argv[])
         LOG(ERROR) << "Error during construction";
         exit(1);
     }
+
     std::string initial_activation_path = 
         tensorflow::io::JoinPath(root_dir, initial_activation);
     auto init_act_tensor_status_pair = 
@@ -67,6 +70,11 @@ int main(int argc, char* argv[])
         exit(1);
     }
     auto init_act_tensor = init_act_tensor_status_pair.second;
+    auto numberOfInputDimensions = init_act_tensor.dims();
+    std::vector<long long> input_shape(numberOfInputDimensions);
+    for(auto i = 0u; i < numberOfInputDimensions; ++i)
+        input_shape[i] = init_act_tensor.dim_size(i);
+
     auto retFeedDict = [&]()
         ->std::vector<std::pair<std::string, tensorflow::Tensor>>
     {
@@ -74,55 +82,68 @@ int main(int argc, char* argv[])
     };
     auto getRetVal = [](std::vector<tensorflow::Tensor> const& outs)
     {
-        std::vector<std::vector<float>> ret;
-        for(auto&& out : outs)
-        {
-            std::vector<float> tmp;
-            auto flat = out.flat<float>();
-            for(auto i = 0u; i < flat.size(); ++i)
-                tmp.push_back(flat(i));
-            ret.push_back(tmp);
-        }
+        std::vector<float> ret;
+        auto flat = outs[0].flat<float>();
+        ret.reserve(flat.size());
+        for(auto i = 0u; i < flat.size(); ++i)
+            ret.push_back(flat(i));
         return ret;
     };
 
-    auto results = gm.feedThroughModel(retFeedDict, getRetVal, {output_layer});
+    auto results = 
+        gm.feedThroughModel(retFeedDict, getRetVal, {output_layer});
     if(!gm.ok())
     {
         LOG(ERROR) << "Error while feeding through model";
         exit(1);
     }
-    for(auto&& res : results)
-    {
-        for(auto&& elem : res)
-            std::cout << elem << " ";
-        std::cout << "\n";
-    }
+    unsigned orig_class = 
+        graph_tool::getClassOfClassificationVector(results);
 
-    auto in_tensor = tensorflow::Tensor(tensorflow::DT_FLOAT, tensorflow::TensorShape({1,28,28,1}));
-    auto in_tensor_flat = in_tensor.shaped<float,2>({28,28});
-    in_tensor_flat(0,0) = (float)20.0;
-    auto in_tensor_copy = in_tensor.flat<float>();
-    for(auto i = 0u; i < 5u; ++i)
-        std::cout << in_tensor_copy(i) << " ";
-    std::cout << "\n";
-    auto ret2FeedDict = [&]()
-        ->std::vector<std::pair<std::string, tensorflow::Tensor>>
-    {
-        return {{input_layer, in_tensor}};
+    std::vector<grid::point> foundAdversarialExamples;
+
+    grid::point granularity = {
+        /* difference between discrete values of each dimension */
     };
-    auto results2 = gm.feedThroughModel(ret2FeedDict, getRetVal, {output_layer});
-    if(!gm.ok())
-    {
-        LOG(ERROR) << "Error while feeding through model for second time";
-        exit(1);
-    }
-    for(auto&& res : results2)
-    {
-        for(auto&& elem : res)
-            std::cout << elem << " ";
-        std::cout << "\n";
-    }
+    auto dimension_selection_strategy = 
+        grid::IntellifeatureDimSelection(
+            /* class averages */,
+            &grid::l2norm,
+            orig_class);
+
+    auto abstraction_strategy = 
+        grid::ModifiedFGSMRegionAbstraction(
+            20,
+            /* gradient function */,
+            dimension_selection_strategy,
+            0.8);
+
+    auto refinement_strategy = 
+        grid::HierarchicalDimensionRefinementStrategy(
+                dimension_selection_strategy,
+                2,
+                4);
+
+    auto all_valid_discretization_strategy = 
+        grid::AllValidDiscretizedPointsAbstraction(
+                graph_tool::tensorToPointConversion(init_act_tensor),
+                granularity);
+    
+    // only attempt discrete search if total
+    // valid points in region is less than a threshold
+    auto discrete_search_attempt_threshold_func = 
+        [&](grid::region const& r)
+        {
+            return all_valid_discretization_strategy
+                .getNumberValidPoints(r) < 100000ull;
+        };
+
+    auto verification_engine = 
+        grid::DiscreteSearchVerificationEngine(
+                discrete_search_attempt_threshold_func,
+                all_valid_discretization_strategy,
+                /* safety function */);
+
     return 0;
 }
 

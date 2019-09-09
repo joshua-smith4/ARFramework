@@ -1,6 +1,5 @@
 #include <iostream>
-#include <exception>
-#include <stdexcept>
+#include <algorithm>
 #include <numeric>
 #include <cmath>
 
@@ -135,6 +134,31 @@ grid::AllValidDiscretizedPointsAbstraction::enumerateAllPoints(
         newp[curIndex] += granularity[curIndex];
     }
     return false;
+}
+
+grid::DiscreteSearchVerificationEngine::DiscreteSearchVerificationEngine(
+        std::function<bool(grid::region const&)>&& shouldAttempt,
+        grid::region_abstraction_strategy_t&& dpg,
+        std::function<bool(point const&)>&& point_safe)
+    : shouldAttemptCheck(shouldAttempt), 
+    discretePointGenerator(dpg), 
+    point_safe_func(point_safe)
+{
+}
+
+grid::verification_engine_return_t
+grid::DiscreteSearchVerificationEngine::operator()(
+        grid::region const& r)
+{
+    if(!shouldAttemptCheck(r)) 
+        return {grid::VERIFICATION_RETURN::UNKNOWN, {}};
+    auto points = discretePointGenerator(r);
+    for(auto&& p : points)
+    {
+        if(!point_safe_func(p))
+            return {grid::VERIFICATION_RETURN::UNSAFE, p};
+    }
+    return {grid::VERIFICATION_RETURN::SAFE, {}};
 }
 
 std::vector<std::size_t> 
@@ -329,8 +353,6 @@ grid::HierarchicalDimensionRefinementStrategy::enumerateAllRegions(
 
 bool operator<(grid::point const& p, grid::region const& r)
 {
-    if(p.size() != r.size()) 
-        throw std::domain_error("Point and region must have the same dimensionality.");
     for(auto i = 0u; i < p.size(); ++i)
     {
         if(p[i] < r[i].first) return true;
@@ -341,8 +363,6 @@ bool operator<(grid::point const& p, grid::region const& r)
 
 bool operator<(grid::region const& r, grid::point const& p)
 {
-    if(p.size() != r.size()) 
-        throw std::domain_error("Point and region must have the same dimensionality.");
     for(auto i = 0u; i < p.size(); ++i)
     {
         if(r[i].second <= p[i]) return true;
@@ -353,8 +373,6 @@ bool operator<(grid::region const& r, grid::point const& p)
 
 bool operator<(grid::region const& r1, grid::region const& r2)
 {
-    if(r1.size() != r2.size()) 
-        throw std::domain_error("Regions must have the same dimensionality.");
     for(auto i = 0u; i < r1.size(); ++i)
     {
         if(r1[i].second <= r2[i].first) return true;
@@ -365,8 +383,6 @@ bool operator<(grid::region const& r1, grid::region const& r2)
 
 bool operator<(grid::point const& p1, grid::point const& p2)
 {
-    if(p1.size() != p2.size()) 
-        throw std::domain_error("Points must have the same dimensionality.");
     for(auto i = 0u; i < p1.size(); ++i)
     {
         if(p1[i] < p2[i]) return true;

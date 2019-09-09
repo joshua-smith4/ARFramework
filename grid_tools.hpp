@@ -54,6 +54,18 @@ namespace grid
     using discrete_enforcement_function_type_t = 
         std::function<point(point const&, point const&, point const&)>;
 
+    enum class VERIFICATION_RETURN
+    {
+        SAFE,
+        UNSAFE,
+        UNKNOWN
+    };
+
+    using verification_engine_return_t = 
+        std::pair<VERIFICATION_RETURN, point>;
+    using verification_engine_type_t = 
+        std::function<verification_engine_return_t(region const&)>;
+
     // think about making this a pass by reference to avoid
     // excessive copying
     point 
@@ -100,6 +112,19 @@ namespace grid
                 grid::region const&);
         grid::point knownValidPoint;
         grid::point granularity;
+    };
+
+    struct DiscreteSearchVerificationEngine
+    {
+        DiscreteSearchVerificationEngine(
+                std::function<bool(region const&)>&& /* should attempt? */,
+                region_abstraction_strategy_t&& /* point generation */,
+                std::function<bool(point const&)>&& /* is point safe */);
+        verification_engine_return_t operator()(region const&);
+    private:
+        std::function<bool(region const&)> shouldAttemptCheck;
+        region_abstraction_strategy_t discretePointGenerator;
+        std::function<bool(point const&)> point_safe_func;
     };
 
     // dimension selection algorithm outlined in
