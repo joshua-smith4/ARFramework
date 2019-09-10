@@ -18,9 +18,13 @@ tf_cc_binary(
     srcs = [
         "main.cpp",
         "GraphManager.cpp",
+        "grid_tools.cpp",
+        "tensorflow_graph_tools.cpp",
     ],
     includes = [
         "GraphManager.hpp",
+        "grid_tools.hpp",
+        "tensorflow_graph_tools.hpp",
     ],
     linkopts = ["-lm"],
     deps = [

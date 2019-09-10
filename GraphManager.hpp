@@ -32,7 +32,7 @@ public:
             InConvFunc&& in_func, 
             OutConvFunc&& out_func, 
             std::vector<std::string> const& output_labels,
-            In&&... in_args) const
+            In&&... in_args)
     {
         auto feed_dict = in_func(std::forward<In>(in_args)...);
         std::vector<tensorflow::Tensor> outputs;

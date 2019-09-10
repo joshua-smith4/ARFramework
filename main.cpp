@@ -25,6 +25,8 @@ int main(int argc, char* argv[])
     std::string graph = "graph.pb";
     std::string input_layer = "input_layer";
     std::string output_layer = "output_layer";
+    std::string gradient_layer = "gradient_layer_tmp_placeholder";
+    std::string granularity = "granularity";
     std::string initial_activation = "initial_activation.pb";
     std::string root_dir = ".";
 
@@ -32,6 +34,8 @@ int main(int argc, char* argv[])
         tensorflow::Flag("graph", &graph, "path to protobuf graph to be executed"),
         tensorflow::Flag("input_layer", &input_layer, "name of input layer"),
         tensorflow::Flag("output_layer", &output_layer, "name of output layer"),
+        tensorflow::Flag("gradient_layer", &gradient_layer, "name of the gradient layer (optional - used for FGSM)"),
+        tensorflow::Flag("granularity", &granularity, "use this option is all dimensions share a discrete range"),
         tensorflow::Flag("initial_activation", &initial_activation, "initial tested activation"),
         tensorflow::Flag("root_dir", &root_dir, "root_dir"),
     };
@@ -49,6 +53,10 @@ int main(int argc, char* argv[])
         LOG(ERROR) << "Unknown argument " << argv[1] << "\n" << usage;
         return -1;
     }
+
+    auto hasGradientLayer = gradient_layer != "gradient_layer_tmp_placeholder";
+    auto granularityProvided = granularity != "granularity";
+    double granularityVal = granularityProvided ? atof(granularity.c_str()) : 1.0;
 
     std::string graph_path = tensorflow::io::JoinPath(root_dir, graph);
     GraphManager gm(graph_path);
@@ -71,54 +79,67 @@ int main(int argc, char* argv[])
     }
     auto init_act_tensor = init_act_tensor_status_pair.second;
     auto numberOfInputDimensions = init_act_tensor.dims();
+    auto flattenedNumDims = 1ull;
     std::vector<long long> input_shape(numberOfInputDimensions);
     for(auto i = 0u; i < numberOfInputDimensions; ++i)
+    {
         input_shape[i] = init_act_tensor.dim_size(i);
+        flattenedNumDims *= input_shape[i];
+    }
 
     auto retFeedDict = [&]()
         ->std::vector<std::pair<std::string, tensorflow::Tensor>>
     {
         return {{input_layer, init_act_tensor}};
     };
-    auto getRetVal = [](std::vector<tensorflow::Tensor> const& outs)
-    {
-        std::vector<float> ret;
-        auto flat = outs[0].flat<float>();
-        ret.reserve(flat.size());
-        for(auto i = 0u; i < flat.size(); ++i)
-            ret.push_back(flat(i));
-        return ret;
-    };
 
     auto results = 
-        gm.feedThroughModel(retFeedDict, getRetVal, {output_layer});
+        gm.feedThroughModel(
+                retFeedDict, 
+                &graph_tool::parseGraphOutToVector, 
+                {output_layer});
     if(!gm.ok())
     {
         LOG(ERROR) << "Error while feeding through model";
         exit(1);
     }
+
     unsigned orig_class = 
         graph_tool::getClassOfClassificationVector(results);
 
     std::vector<grid::point> foundAdversarialExamples;
 
-    grid::point granularity = {
-        /* difference between discrete values of each dimension */
-    };
-    auto dimension_selection_strategy = 
-        grid::IntellifeatureDimSelection(
-            /* class averages */,
-            &grid::l2norm,
-            orig_class);
+    /* difference between discrete values of each dimension */
+    grid::point granularity_parsed;
+    granularity_parsed.reserve(flattenedNumDims);
+    std::fill_n(std::back_inserter(granularity_parsed), flattenedNumDims, granularityVal);
 
-    auto abstraction_strategy = 
-        grid::ModifiedFGSMRegionAbstraction(
-            20,
-            /* gradient function */,
-            dimension_selection_strategy,
-            0.8);
+    grid::dimension_selection_strategy_t dimension_selection_strategy = 
+        grid::maxAverageDimSelection;
+    if(hasGradientLayer)
+        dimension_selection_strategy = 
+            grid::IntellifeatureDimSelection(
+                {}, // TODO: fill with class averages
+                &grid::l2norm,
+                orig_class);
 
-    auto refinement_strategy = 
+    grid::region_abstraction_strategy_t abstraction_strategy = 
+        grid::centralPointRegionAbstraction;
+    if(hasGradientLayer)
+        abstraction_strategy = 
+            grid::ModifiedFGSMRegionAbstraction(
+                20,
+                [&](grid::point const& p)
+                {
+                    return gm.feedThroughModel(
+                            std::bind(graph_tool::makeFeedDict, input_layer, p, input_shape),
+                            graph_tool::parseGraphOutToVector,
+                            {gradient_layer});
+                },
+                dimension_selection_strategy,
+                0.8);
+
+    grid::region_refinement_strategy_t refinement_strategy = 
         grid::HierarchicalDimensionRefinementStrategy(
                 dimension_selection_strategy,
                 2,
@@ -127,22 +148,32 @@ int main(int argc, char* argv[])
     auto all_valid_discretization_strategy = 
         grid::AllValidDiscretizedPointsAbstraction(
                 graph_tool::tensorToPointConversion(init_act_tensor),
-                granularity);
+                granularity_parsed);
     
     // only attempt discrete search if total
     // valid points in region is less than a threshold
+    const auto discrete_search_attempt_threshold = 100000ull;
     auto discrete_search_attempt_threshold_func = 
         [&](grid::region const& r)
         {
             return all_valid_discretization_strategy
-                .getNumberValidPoints(r) < 100000ull;
+                .getNumberValidPoints(r) 
+                < discrete_search_attempt_threshold;
         };
 
     auto verification_engine = 
         grid::DiscreteSearchVerificationEngine(
                 discrete_search_attempt_threshold_func,
                 all_valid_discretization_strategy,
-                /* safety function */);
+                [&](grid::point const& p)
+                {
+                    auto logits_out = gm.feedThroughModel(
+                            std::bind(graph_tool::makeFeedDict, input_layer, p, input_shape),
+                            &graph_tool::parseGraphOutToVector,
+                            {output_layer});
+                    auto class_out = graph_tool::getClassOClassificationVector(logits_out);
+                    return class_out == orig_class;
+                });
 
     return 0;
 }

@@ -1,6 +1,6 @@
 #include "tensorflow_graph_tools.hpp"
 
-int graph_tool::getClassOfClassificationTensor(
+unsigned graph_tool::getClassOfClassificationTensor(
         tensorflow::Tensor const& t)
 {
     unsigned retVal = 0u;
@@ -21,7 +21,7 @@ int graph_tool::getClassOfClassificationTensor(
 
 tensorflow::Tensor graph_tool::pointToTensorConversion(
         grid::point const& p,
-        std::vector<int> const& shape)
+        std::vector<int64_t> const& shape) // TensorShape expects initializer list
 {
     tensorflow::Tensor retVal(tensorflow::DT_FLOAT,
             tensorflow::TensorShape(shape));
@@ -39,5 +39,19 @@ grid::point graph_tool::tensorToPointConversion(
     for(auto i = 0u; i < flattened.size(); ++i)
         retVal.push_back(flattened(i));
     return retVal;
+}
+
+graph_tool::feed_dict_type_t graph_tool::makeFeedDict(
+        std::string const& input_name, 
+        grid::point const& p,
+        std::vector<int64_t> const& shape)
+{
+    return {{input_name, graph_tool::pointToTensorConversion(p, shape)}};
+}
+
+grid::point graph_tool::parseGraphOutToVector(
+        std::vector<tensorflow::Tensor> const& out)
+{
+    return graph_tool::tensorToPointConversion(out[0]);
 }
 
