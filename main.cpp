@@ -27,6 +27,7 @@ int main(int argc, char* argv[])
     std::string output_layer = "output_layer";
     std::string gradient_layer = "gradient_layer_tmp_placeholder";
     std::string granularity = "granularity";
+    std::string verification_radius = "verification radius";
     std::string initial_activation = "initial_activation.pb";
     std::string root_dir = ".";
 
@@ -36,6 +37,7 @@ int main(int argc, char* argv[])
         tensorflow::Flag("output_layer", &output_layer, "name of output layer"),
         tensorflow::Flag("gradient_layer", &gradient_layer, "name of the gradient layer (optional - used for FGSM)"),
         tensorflow::Flag("granularity", &granularity, "use this option is all dimensions share a discrete range"),
+        tensorflow::Flag("verification_radius", &verification_radius, "'radius' of hyperrectangle within which safety is to be verified"),
         tensorflow::Flag("initial_activation", &initial_activation, "initial tested activation"),
         tensorflow::Flag("root_dir", &root_dir, "root_dir"),
     };
@@ -58,6 +60,14 @@ int main(int argc, char* argv[])
     auto granularityProvided = granularity != "granularity";
     double granularityVal = granularityProvided ? atof(granularity.c_str()) : 1.0;
 
+    auto radiusProvided = verification_radius != "verification radius";
+    if(!radiusProvided)
+    {
+        LOG(ERROR) << "Must provide verification radius.";
+        return -1;
+    }
+    auto radius = radiusProvided ? atof(verification_radius.c_str()) : 0.5;
+
     std::string graph_path = tensorflow::io::JoinPath(root_dir, graph);
     GraphManager gm(graph_path);
     if(!gm.ok())
@@ -77,6 +87,7 @@ int main(int argc, char* argv[])
             << initial_activation_path;
         exit(1);
     }
+
     auto init_act_tensor = init_act_tensor_status_pair.second;
     auto numberOfInputDimensions = init_act_tensor.dims();
     auto flattenedNumDims = 1ull;
@@ -93,7 +104,7 @@ int main(int argc, char* argv[])
         return {{input_layer, init_act_tensor}};
     };
 
-    auto results = 
+    auto logits_init_activation = 
         gm.feedThroughModel(
                 retFeedDict, 
                 &graph_tool::parseGraphOutToVector, 
@@ -105,8 +116,15 @@ int main(int argc, char* argv[])
     }
 
     unsigned orig_class = 
-        graph_tool::getClassOfClassificationVector(results);
+        graph_tool::getClassOfClassificationVector(logits_init_activation);
 
+
+    std::cout << "granularity: " << granularityVal << "\n";
+    std::cout << "original class: " << orig_class << "\n";
+    std::cout << "input shape: ";
+    for(auto&& elem : input_shape)
+        std::cout << elem << " ";
+    std::cout << "\n";
     std::vector<grid::point> foundAdversarialExamples;
 
     /* difference between discrete values of each dimension */
@@ -128,8 +146,8 @@ int main(int argc, char* argv[])
     if(hasGradientLayer)
         abstraction_strategy = 
             grid::ModifiedFGSMRegionAbstraction(
-                20,
-                [&](grid::point const& p)
+                20u,
+                [&](grid::point const& p) -> grid::point
                 {
                     return gm.feedThroughModel(
                             std::bind(graph_tool::makeFeedDict, input_layer, p, input_shape),
@@ -171,7 +189,8 @@ int main(int argc, char* argv[])
                             std::bind(graph_tool::makeFeedDict, input_layer, p, input_shape),
                             &graph_tool::parseGraphOutToVector,
                             {output_layer});
-                    auto class_out = graph_tool::getClassOClassificationVector(logits_out);
+                    auto class_out = 
+                        graph_tool::getClassOfClassificationVector(logits_out);
                     return class_out == orig_class;
                 });
 

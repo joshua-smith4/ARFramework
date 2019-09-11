@@ -14,7 +14,7 @@ exports_files(["data/grace_hopper.jpg"])
 load("//tensorflow:tensorflow.bzl", "tf_cc_binary")
 
 tf_cc_binary(
-    name = "gm_label_image",
+    name = "ARFramework_main",
     srcs = [
         "main.cpp",
         "GraphManager.cpp",

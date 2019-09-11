@@ -137,9 +137,9 @@ grid::AllValidDiscretizedPointsAbstraction::enumerateAllPoints(
 }
 
 grid::DiscreteSearchVerificationEngine::DiscreteSearchVerificationEngine(
-        std::function<bool(grid::region const&)>&& shouldAttempt,
-        grid::region_abstraction_strategy_t&& dpg,
-        std::function<bool(point const&)>&& point_safe)
+        std::function<bool(grid::region const&)> const& shouldAttempt,
+        grid::region_abstraction_strategy_t const& dpg,
+        std::function<bool(point const&)> const& point_safe)
     : shouldAttemptCheck(shouldAttempt), 
     discretePointGenerator(dpg), 
     point_safe_func(point_safe)
@@ -234,8 +234,8 @@ grid::point grid::sign(grid::point const& p)
 
 grid::ModifiedFGSMRegionAbstraction::ModifiedFGSMRegionAbstraction(
         std::size_t mp, 
-        std::function<grid::point(grid::point const&)>&& grad,
-        grid::dimension_selection_strategy_t&& dim_sel,
+        std::function<grid::point(grid::point const&)> const& grad,
+        grid::dimension_selection_strategy_t const& dim_sel,
         double pFGSM)
     : maxPoints(mp), gradient(grad), 
       dim_select_strategy(dim_sel),
@@ -305,7 +305,7 @@ grid::ModifiedFGSMRegionAbstraction::operator()(grid::region const& r)
 }
 
 grid::HierarchicalDimensionRefinementStrategy::HierarchicalDimensionRefinementStrategy(
-        grid::dimension_selection_strategy_t&& dim_select,
+        grid::dimension_selection_strategy_t const& dim_select,
         unsigned divisor,
         unsigned ndims)
     : dim_select_strategy(dim_select), dim_divisor(divisor), numDims(ndims)

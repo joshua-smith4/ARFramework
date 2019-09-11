@@ -117,9 +117,9 @@ namespace grid
     struct DiscreteSearchVerificationEngine
     {
         DiscreteSearchVerificationEngine(
-                std::function<bool(region const&)>&& /* should attempt? */,
-                region_abstraction_strategy_t&& /* point generation */,
-                std::function<bool(point const&)>&& /* is point safe */);
+                std::function<bool(region const&)> const& /* should attempt? */,
+                region_abstraction_strategy_t const& /* point generation */,
+                std::function<bool(point const&)> const& /* is point safe */);
         verification_engine_return_t operator()(region const&);
     private:
         std::function<bool(region const&)> shouldAttemptCheck;
@@ -154,8 +154,8 @@ namespace grid
     {
         ModifiedFGSMRegionAbstraction(
                 std::size_t /* number of points to generate */, 
-                std::function<point(point const&)>&& /* gradient */,
-                dimension_selection_strategy_t&&,
+                std::function<point(point const&)> const& /* gradient */,
+                dimension_selection_strategy_t const&,
                 double /* percent of dimensions for normal FGSM */);
         abstraction_strategy_return_t operator()(region const&);
     private:
@@ -168,7 +168,7 @@ namespace grid
     struct HierarchicalDimensionRefinementStrategy
     {
         HierarchicalDimensionRefinementStrategy(
-                dimension_selection_strategy_t&&,
+                dimension_selection_strategy_t const&,
                 unsigned /* dimension divisor */,
                 unsigned /* number of dimensions to subdivide */);
         refinement_strategy_return_t operator()(region const&);
