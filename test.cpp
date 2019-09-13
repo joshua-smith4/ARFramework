@@ -3,13 +3,39 @@
 #include <cmath>
 #include <cassert>
 #include <iostream>
+#include <set>
+
 
 int main()
 {
+    std::set<grid::region, grid::region_less_compare> region_set;
+
+    grid::region reg1 = {{1,2},{0,3},{2,7}};
+    grid::region reg2 = {{1,2},{0,3},{7,9}};
+    grid::region reg3 = {{1,2},{0,3},{8.999,10}};
+    grid::region reg4 = {{0,1},{0,3},{7,9}};
+
+    grid::point p1 = { 1,0,2 };
+    grid::point p2 = {1,3,7};
+    grid::point p3 = {1,2,7};
+
+    region_set.insert(reg1);
+    region_set.insert(reg2);
+    region_set.insert(reg3);
+    region_set.insert(reg4);
+
+    assert(region_set.size() == 3);
+    auto p1find = region_set.find(p1);
+    assert(p1find != region_set.end() && p1find == region_set.find(reg1));
+    assert(region_set.find(p2) == region_set.end());
+    auto p3find = region_set.find(p3);
+    assert(region_set.find(reg2) == p3find);
+
     grid::point granularity({0.25, 1.25, 0.5});
     grid::point valid_point({0, 1, 2});
     grid::point close_point({1.2, -0.2, 2.25});
     grid::region reg({{1,3},{2,6},{1,5}});
+
     auto snapped_point = 
         grid::enforceSnapDiscreteGrid(
                 close_point, 

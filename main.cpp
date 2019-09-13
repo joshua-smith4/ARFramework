@@ -1,3 +1,4 @@
+#include <map>
 #include <iostream>
 #include <fstream>
 
@@ -12,13 +13,6 @@
 #include "GraphManager.hpp"
 #include "grid_tools.hpp"
 
-// command
-//
-/*
-
-bazel-bin/tensorflow/ARFramework/gm_label_image --root_dir="/Users/JoshuaSmith/tensorflow/tensorflow/ARFramework" --graph="mnist_model.pb" --input_layer="input_mnist_input" --output_layer="k2tfout_0" --initial_activation="mnist_1000.pb"
-
-*/
 
 int main(int argc, char* argv[])
 {
@@ -89,6 +83,8 @@ int main(int argc, char* argv[])
     }
 
     auto init_act_tensor = init_act_tensor_status_pair.second;
+    auto init_act_point = graph_tool::tensorToPointConversion(
+            init_act_tensor);
     auto numberOfInputDimensions = init_act_tensor.dims();
     auto flattenedNumDims = 1ull;
     std::vector<long long> input_shape(numberOfInputDimensions);
@@ -125,12 +121,14 @@ int main(int argc, char* argv[])
     for(auto&& elem : input_shape)
         std::cout << elem << " ";
     std::cout << "\n";
-    std::vector<grid::point> foundAdversarialExamples;
 
     /* difference between discrete values of each dimension */
     grid::point granularity_parsed;
     granularity_parsed.reserve(flattenedNumDims);
-    std::fill_n(std::back_inserter(granularity_parsed), flattenedNumDims, granularityVal);
+    std::fill_n(
+            std::back_inserter(granularity_parsed), 
+            flattenedNumDims, 
+            granularityVal);
 
     grid::dimension_selection_strategy_t dimension_selection_strategy = 
         grid::maxAverageDimSelection;
@@ -150,7 +148,8 @@ int main(int argc, char* argv[])
                 [&](grid::point const& p) -> grid::point
                 {
                     return gm.feedThroughModel(
-                            std::bind(graph_tool::makeFeedDict, input_layer, p, input_shape),
+                            std::bind(graph_tool::makeFeedDict, 
+                                input_layer, p, input_shape),
                             graph_tool::parseGraphOutToVector,
                             {gradient_layer});
                 },
@@ -179,20 +178,151 @@ int main(int argc, char* argv[])
                 < discrete_search_attempt_threshold;
         };
 
+    auto isPointSafe = [&](grid::point const& p)
+            {
+                auto logits_out = gm.feedThroughModel(
+                        std::bind(graph_tool::makeFeedDict, 
+                            input_layer, p, input_shape),
+                        &graph_tool::parseGraphOutToVector,
+                        {output_layer});
+                auto class_out = 
+                    graph_tool::getClassOfClassificationVector(logits_out);
+                return class_out == orig_class;
+            };
+
     auto verification_engine = 
         grid::DiscreteSearchVerificationEngine(
                 discrete_search_attempt_threshold_func,
                 all_valid_discretization_strategy,
-                [&](grid::point const& p)
+                isPointSafe);
+
+    std::set<grid::point, grid::region_less_compare> 
+        foundAdversarialExamples;
+    std::vector<grid::region> potentiallyUnsafeRegions;
+    std::vector<grid::region> safeRegions;
+    std::vector<std::pair<grid::region, grid::point>> 
+        unsafeRegionsWithAdvExamples;
+
+    // create the initial region from the initial activation
+    // and the user provided radius
+    grid::region orig_region(init_act_point.size());
+    for(auto i = 0u; i < init_act_point.size(); ++i)
+    {
+        orig_region[i].first = init_act_point[i] - radius;
+        orig_region[i].second = init_act_point[i] + radius;
+    }
+
+    potentiallyUnsafeRegions.push_back(orig_region);
+
+    while(!potentiallyUnsafeRegions.empty() || 
+            !unsafeRegionsWithAdvExamples.empty())
+    {
+        std::cout << "Number of unchecked regions: "
+            << potentiallyUnsafeRegions.size() << "\n";
+        std::cout << "Number of unsafe regions: "
+            << unsafeRegionsWithAdvExamples.size() << "\n";
+        if(!potentiallyUnsafeRegions.empty())
+        {
+            auto selected_region = potentiallyUnsafeRegions.back();
+            potentiallyUnsafeRegions.pop_back();
+            auto verification_result = 
+                verification_engine(selected_region);
+            if(verification_result.first == 
+                    grid::VERIFICATION_RETURN::SAFE)
+            {
+                safeRegions.push_back(selected_region);
+            }
+            else if(verification_result.first == 
+                    grid::VERIFICATION_RETURN::UNSAFE)
+            {
+                foundAdversarialExamples.insert(
+                        verification_result.second);    
+                auto subregions = refinement_strategy(selected_region);
+                auto subregion_with_adv_exp = 
+                    subregions.find(verification_result.second);
+                if(subregions.end() == subregion_with_adv_exp)
                 {
-                    auto logits_out = gm.feedThroughModel(
-                            std::bind(graph_tool::makeFeedDict, input_layer, p, input_shape),
-                            &graph_tool::parseGraphOutToVector,
-                            {output_layer});
-                    auto class_out = 
-                        graph_tool::getClassOfClassificationVector(logits_out);
-                    return class_out == orig_class;
-                });
+                    LOG(ERROR) << "Adversarial example was found that did not belong to any subregions";
+                }
+                else
+                {
+                    unsafeRegionsWithAdvExamples.push_back({*subregion_with_adv_exp, verification_result.second});
+                    subregions.erase(subregion_with_adv_exp);
+                }
+                std::copy(subregions.begin(), subregions.end(),
+                        std::back_inserter(potentiallyUnsafeRegions));
+            }
+            else if(verification_result.first == 
+                    grid::VERIFICATION_RETURN::UNKNOWN)
+            {
+                auto subregions = refinement_strategy(selected_region);
+                std::map<grid::region, grid::point> unsafeRegionsTmp;
+                std::vector<grid::point> all_abstracted_points;
+                for(auto&& subregion : subregions)
+                {
+                    auto abstracted_points = abstraction_strategy(subregion);
+                    for(auto&& pt : abstracted_points)
+                    {
+                        all_abstracted_points.push_back(
+                                grid::enforceSnapDiscreteGrid(
+                                    pt,
+                                    init_act_point,
+                                    granularity_parsed));
+                    }
+                }
+                for(auto&& pt : all_abstracted_points)
+                {
+                    auto found_subregion = subregions.find(pt);
+                    if(found_subregion == subregions.end()) continue;
+                    unsafeRegionsTmp.insert({*found_subregion, pt});
+                    subregions.erase(found_subregion);
+                }
+                std::copy(unsafeRegionsTmp.begin(),
+                        unsafeRegionsTmp.end(),
+                        std::back_inserter(unsafeRegionsWithAdvExamples));
+                std::copy(subregions.begin(), 
+                        subregions.end(),
+                        std::back_inserter(potentiallyUnsafeRegions));
+            }
+        }
+        else
+        {
+            auto selected_region_adv_exp_pair = 
+                unsafeRegionsWithAdvExamples.back();
+            unsafeRegionsWithAdvExamples.pop_back();
+            if(grid::AllValidDiscretizedPointsAbstraction
+                    ::getNumberValidPoints(
+                        selected_region_adv_exp_pair.first, 
+                        init_act_point, 
+                        granularity_parsed) 
+                    <= 1ull)
+            {
+                // potentially irrelevant command to insert
+                // has been inserted previously
+                // but cant hurt
+                foundAdversarialExamples.insert(
+                        selected_region_adv_exp_pair.second);
+                continue;
+            }
+            auto subregions = refinement_strategy(
+                    selected_region_adv_exp_pair.first);
+            auto unsafeRegionItr = subregions.find(
+                    selected_region_adv_exp_pair.second);
+            if(unsafeRegionItr != subregions.end())
+            {
+                unsafeRegionsWithAdvExamples.push_back(
+                        {*unsafeRegionItr, 
+                        selected_region_adv_exp_pair.second});
+            }
+            else
+            {
+                LOG(ERROR) << "Adversarial example was found not belonging to region after refined";
+            }
+            subregions.erase(unsafeRegionItr);
+            std::copy(subregions.begin(), subregions.end(),
+                    std::back_inserter(potentiallyUnsafeRegions));
+        }
+    }
 
     return 0;
 }

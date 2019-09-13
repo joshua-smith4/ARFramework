@@ -29,6 +29,14 @@ bool grid::isValidRegion(grid::region const & r)
     return true;
 }
 
+bool grid::pointIsInRegion(grid::region const& r, grid::point const& p)
+{
+    for(auto i = 0u; i < r.size(); ++i)
+        if(p[i] < r[i].first || p[i] >= r[i].second)
+            return false;
+    return true;
+}
+
 long double grid::regionVolume(grid::region const& r)
 {
     return std::accumulate(r.begin(), r.end(), static_cast<long double>(1.0), 
@@ -84,9 +92,11 @@ grid::AllValidDiscretizedPointsAbstraction::operator()(
 
 unsigned long long 
 grid::AllValidDiscretizedPointsAbstraction::getNumberValidPoints(
-        grid::region const& r)
+        grid::region const& r,// region in question 
+        grid::point const& p, // valid point
+        grid::point const& g) // granularity
 {
-    auto validPointInRegion = findValidPointInRegion(r);
+    auto validPointInRegion = findValidPointInRegion(r, p, g);
     if(!validPointInRegion.first) return 0ull;
     auto retVal = 1ull;
     for(auto i = 0u; i < r.size(); ++i)
@@ -95,27 +105,43 @@ grid::AllValidDiscretizedPointsAbstraction::getNumberValidPoints(
         auto numPointsInDim =  
             static_cast<unsigned long long>(
                     ceil((r[i].second - validPointInRegion.second[i])
-                    / granularity[i]));
+                    / g[i]));
         retVal *= numPointsInDim;
     }
     return retVal;
+}
+
+unsigned long long 
+grid::AllValidDiscretizedPointsAbstraction::getNumberValidPoints(
+        grid::region const& r)
+{
+    return getNumberValidPoints(r, knownValidPoint, granularity);
+}
+
+std::pair<bool, grid::point> 
+grid::AllValidDiscretizedPointsAbstraction::findValidPointInRegion(
+        grid::region const& r,
+        grid::point const& p,
+        grid::point const& g)
+{
+    grid::point retVal(r.size());
+    for(auto i = 0u; i < r.size(); ++i)
+    {
+        auto multiplier = 
+            ceil((r[i].first - p[i]) / g[i]);
+        auto value = p[i] + multiplier*g[i]; 
+        if(value >= r[i].second && value != r[i].first)
+            return {false, {}};
+        retVal[i] = value;
+    }
+    return {true, retVal};
 }
 
 std::pair<bool, grid::point> 
 grid::AllValidDiscretizedPointsAbstraction::findValidPointInRegion(
         grid::region const& r)
 {
-    grid::point retVal(r.size());
-    for(auto i = 0u; i < r.size(); ++i)
-    {
-        auto multiplier = 
-            ceil((r[i].first - knownValidPoint[i]) / granularity[i]);
-        auto value = knownValidPoint[i] + multiplier*granularity[i]; 
-        if(value >= r[i].second && value != r[i].first)
-            return {false, {}};
-        retVal[i] = value;
-    }
-    return {true, retVal};
+    return findValidPointInRegion(r, knownValidPoint, granularity);
 }
 
 bool 
@@ -294,12 +320,13 @@ grid::ModifiedFGSMRegionAbstraction::operator()(grid::region const& r)
             elem = dist_R(rand_gen);
             if(elem != 1) elem = -1;
         }
-        retVal.emplace_back(
-                constVecMult(
-                    e1, 
-                    elementWiseMult(grad_sign,M) + constVecMult(
-                        e2, 
-                        elementWiseMult(R,Mnot))));
+        auto generated_point = constVecMult(
+                e1, 
+                elementWiseMult(grad_sign,M) + constVecMult(
+                    e2, 
+                    elementWiseMult(R,Mnot)));
+        if(grid::pointIsInRegion(r, generated_point))
+            retVal.push_back(generated_point);
     }
     return retVal;
 }
@@ -344,7 +371,7 @@ grid::HierarchicalDimensionRefinementStrategy::enumerateAllRegions(
     while(newr[curIndex].second <= orig_region[curIndex].second)
     {
         if(enumerateAllRegions(s, newr, index+1, selected_dims, orig_region))
-            s.push_back(newr);
+            s.insert(newr);
         newr[curIndex].first = newr[curIndex].second;
         newr[curIndex].second += diff;
     }

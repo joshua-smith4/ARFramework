@@ -10,6 +10,7 @@
 
 namespace grid
 {
+    struct region_less_compare;
     // numeric type used to represent regions and points
     // long double for highest precision
     using numeric_type_t = long double;
@@ -25,7 +26,8 @@ namespace grid
     using point = std::vector<numeric_type_t>;
 
 
-    using refinement_strategy_return_t = std::vector<region>; 
+    using refinement_strategy_return_t = 
+        std::set<region, region_less_compare>; 
     // takes a region and returns a partition of that region
     using region_refinement_strategy_t = 
         std::function<refinement_strategy_return_t(region const&)>;
@@ -77,6 +79,8 @@ namespace grid
     // definition of valid region
     bool isValidRegion(region const&);
 
+    bool pointIsInRegion(region const&, point const&);
+
     long double regionVolume(region const&);
     // filter strategy based on the 'volume' of a region
     // compared to a threshold
@@ -101,7 +105,15 @@ namespace grid
                 point /* knownValidPoint */, 
                 point /* granularity */);
         abstraction_strategy_return_t operator()(grid::region const&);
+        static unsigned long long getNumberValidPoints(
+                grid::region const&, 
+                grid::point const&,
+                grid::point const&);
         unsigned long long getNumberValidPoints(grid::region const&);
+        static std::pair<bool, grid::point> findValidPointInRegion(
+                grid::region const&, 
+                grid::point const&,
+                grid::point const&);
         std::pair<bool, grid::point> findValidPointInRegion(
                 grid::region const&);
     private:
@@ -189,6 +201,30 @@ bool operator<(grid::point const&, grid::region const&);
 bool operator<(grid::region const&, grid::point const&);
 bool operator<(grid::region const&, grid::region const&);
 bool operator<(grid::point const&, grid::point const&);
+
+namespace grid
+{
+    struct region_less_compare
+    {
+        using is_transparent = void;
+        bool operator()(grid::point const& p, grid::region const& r) const
+        {
+            return p < r;
+        }
+        bool operator()(grid::region const& r, grid::point const& p) const
+        {
+            return r < p;
+        }
+        bool operator()(grid::region const& r1, grid::region const& r2) const
+        {
+            return r1 < r2;
+        }
+        bool operator()(grid::point const& p1, grid::point const& p2) const
+        {
+            return p1 < p2;
+        }
+    };
+}
 
 grid::point operator-(grid::point const&, grid::point const&);
 grid::point operator+(grid::point const&, grid::point const&);
