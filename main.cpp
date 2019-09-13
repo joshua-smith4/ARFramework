@@ -83,15 +83,18 @@ int main(int argc, char* argv[])
     }
 
     auto init_act_tensor = init_act_tensor_status_pair.second;
-    auto init_act_point = graph_tool::tensorToPointConversion(
+    auto init_act_point = graph_tool::tensorToPoint(
             init_act_tensor);
     auto numberOfInputDimensions = init_act_tensor.dims();
     auto flattenedNumDims = 1ull;
-    std::vector<long long> input_shape(numberOfInputDimensions);
+    std::vector<int64_t> batch_input_shape(numberOfInputDimensions);
+    std::vector<int64_t> input_shape(numberOfInputDimensions - 1);
     for(auto i = 0u; i < numberOfInputDimensions; ++i)
     {
-        input_shape[i] = init_act_tensor.dim_size(i);
-        flattenedNumDims *= input_shape[i];
+        if(i != 0)
+            input_shape[i - 1] = init_act_tensor.dim_size(i);
+        batch_input_shape[i] = init_act_tensor.dim_size(i);
+        flattenedNumDims *= batch_input_shape[i];
     }
 
     auto retFeedDict = [&]()
@@ -118,7 +121,7 @@ int main(int argc, char* argv[])
     std::cout << "granularity: " << granularityVal << "\n";
     std::cout << "original class: " << orig_class << "\n";
     std::cout << "input shape: ";
-    for(auto&& elem : input_shape)
+    for(auto&& elem : batch_input_shape)
         std::cout << elem << " ";
     std::cout << "\n";
 
@@ -149,7 +152,7 @@ int main(int argc, char* argv[])
                 {
                     return gm.feedThroughModel(
                             std::bind(graph_tool::makeFeedDict, 
-                                input_layer, p, input_shape),
+                                input_layer, p, batch_input_shape),
                             graph_tool::parseGraphOutToVector,
                             {gradient_layer});
                 },
@@ -164,7 +167,7 @@ int main(int argc, char* argv[])
 
     auto all_valid_discretization_strategy = 
         grid::AllValidDiscretizedPointsAbstraction(
-                graph_tool::tensorToPointConversion(init_act_tensor),
+                graph_tool::tensorToPoint(init_act_tensor),
                 granularity_parsed);
     
     // only attempt discrete search if total
@@ -182,7 +185,7 @@ int main(int argc, char* argv[])
             {
                 auto logits_out = gm.feedThroughModel(
                         std::bind(graph_tool::makeFeedDict, 
-                            input_layer, p, input_shape),
+                            input_layer, p, batch_input_shape),
                         &graph_tool::parseGraphOutToVector,
                         {output_layer});
                 auto class_out = 

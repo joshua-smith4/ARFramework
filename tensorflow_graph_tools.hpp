@@ -19,11 +19,18 @@ namespace graph_tool
         return std::distance(classes.begin(), max_elem);
     }
 
-    tensorflow::Tensor pointToTensorConversion(
+    tensorflow::Tensor pointToTensor(
             grid::point const&,
             std::vector<int64_t> const&);
 
-    grid::point tensorToPointConversion(
+    tensorflow::Tensor pointsToTensor(
+            std::vector<grid::point> const&,
+            std::vector<int64_t> const&);
+
+    grid::point tensorToPoint(
+            tensorflow::Tensor const&);
+
+    std::vector<grid::point> tensorToPoints(
             tensorflow::Tensor const&);
     
     using feed_dict_type_t = std::vector<std::pair<std::string, tensorflow::Tensor>>;
