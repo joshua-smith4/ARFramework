@@ -5,6 +5,62 @@
 
 #include "grid_tools.hpp"
 
+grid::region grid::snapToDomainRange(
+        grid::region const& r,
+        grid::region const& range)
+{
+    grid::region retVal(r);
+    for(auto i = 0u; i < r.size(); ++i)
+    {
+        if(retVal[i].first < r[i].first) retVal[i].first = r[i].first;
+        if(retVal[i].second < r[i].first) retVal[i].second = r[i].first;
+        if(retVal[i].first > r[i].second) retVal[i].first = r[i].second;
+        if(retVal[i].second > r[i].second) retVal[i].second = r[i].second;
+    }
+    return retVal;
+}
+
+grid::point grid::snapToDomainRange(
+        grid::point const& p,
+        grid::region const& r)
+{
+    grid::point retVal(p);
+    for(auto i = 0u; i < p.size(); ++i)
+    {
+        if(retVal[i] < r[i].first) retVal[i] = r[i].first;
+        else if(retVal[i] > r[i].second) retVal[i] = r[i].second;
+    }
+    return retVal;
+}
+
+bool grid::isInDomainRange(
+        grid::point const& p, 
+        grid::region const& range)
+{
+    for(auto i = 0u; i < p.size(); ++i)
+    {
+        if(p[i] < range[i].first ||
+                p[i] > range[i].second)
+            return false;
+    }
+    return true;
+}
+
+bool grid::isInDomainRange(
+        grid::region const& r, 
+        grid::region const& range)
+{
+    for(auto i = 0u; i < r.size(); ++i)
+    {
+        if(r[i].first < range[i].first ||
+                r[i].second < range[i].first ||
+                r[i].first > range[i].second ||
+                r[i].second > range[i].second)
+            return false;
+    }
+    return true;
+}
+
 grid::point grid::enforceSnapDiscreteGrid(
         grid::point const& p, 
         grid::point const& referencePoint, 
@@ -177,7 +233,10 @@ grid::DiscreteSearchVerificationEngine::operator()(
         grid::region const& r)
 {
     if(!shouldAttemptCheck(r)) 
+    {
         return {grid::VERIFICATION_RETURN::UNKNOWN, {}};
+    }
+    std::cout << "Going to verify entire region\n";
     auto points = discretePointGenerator(r);
     for(auto&& p : points)
     {
@@ -187,7 +246,18 @@ grid::DiscreteSearchVerificationEngine::operator()(
     return {grid::VERIFICATION_RETURN::SAFE, {}};
 }
 
-std::vector<std::size_t> 
+grid::dim_selection_strategy_return_t
+grid::randomDimSelection(region const& r, std::size_t numDims)
+{
+    grid::dim_selection_strategy_return_t indices(r.size());
+    std::iota(indices.begin(), indices.end(), 0);
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(indices.begin(), indices.end(), g);
+    return {indices.begin(), indices.begin() + numDims};
+}
+
+grid::dim_selection_strategy_return_t
 grid::maxAverageDimSelection(grid::region const& r, std::size_t numDims)
 {
     if(numDims > r.size()) 
@@ -469,3 +539,20 @@ std::ostream& operator<<(std::ostream& os, grid::point const& p)
         os << "(" << r << ")" << " | ";
     return os;
 }
+
+std::ostream& operator<<(std::ostream& os, 
+        grid::VERIFICATION_RETURN const& v)
+{
+    switch(v)
+    {
+    case grid::VERIFICATION_RETURN::SAFE:
+        os << "SAFE"; break;
+    case grid::VERIFICATION_RETURN::UNSAFE:
+        os << "UNSAFE"; break;
+    case grid::VERIFICATION_RETURN::UNKNOWN:
+        os << "UNKNOWN"; break;
+    }
+    return os;
+}
+
+

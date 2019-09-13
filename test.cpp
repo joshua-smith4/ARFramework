@@ -67,13 +67,18 @@ int main()
     auto avd_abstr = grid::AllValidDiscretizedPointsAbstraction(
             valid_point, granularity);
     auto all_valid_points = avd_abstr(reg);
+    auto num_valid_points_static = 
+        grid::AllValidDiscretizedPointsAbstraction
+        ::getNumberValidPoints(reg, valid_point, granularity);
     auto num_valid_points = avd_abstr.getNumberValidPoints(reg);
     auto p_in_region = avd_abstr.findValidPointInRegion(reg);
     assert(p_in_region.first);
     assert(p_in_region.second[0] == 1);
     assert(p_in_region.second[1] == 2.25);
     assert(p_in_region.second[2] == 1);
-    assert(all_valid_points.size() == num_valid_points);
+    std::cout << num_valid_points << "\n";
+    assert(all_valid_points.size() == num_valid_points
+            && num_valid_points == num_valid_points_static);
     assert(num_valid_points == 192);
 
     auto dims_mad = grid::maxAverageDimSelection(reg, 3);

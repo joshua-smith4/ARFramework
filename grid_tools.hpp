@@ -68,6 +68,19 @@ namespace grid
     using verification_engine_type_t = 
         std::function<verification_engine_return_t(region const&)>;
 
+    region
+    snapToDomainRange(
+            region const&, /* region */
+            region const&);
+
+    point
+    snapToDomainRange(
+            point const&, /* point */
+            region const& /* domain range */);
+
+    bool isInDomainRange(point const&, region const&);
+    bool isInDomainRange(region const&, region const&);
+
     // think about making this a pass by reference to avoid
     // excessive copying
     point 
@@ -139,9 +152,14 @@ namespace grid
         std::function<bool(point const&)> point_safe_func;
     };
 
+    // random dimension selection algorithm
+    dim_selection_strategy_return_t randomDimSelection(region const&, 
+            std::size_t);
+
     // dimension selection algorithm outlined in
     // the DLV paper (Xiaowei et. al.)
-    std::vector<std::size_t> maxAverageDimSelection(region const&, std::size_t);
+    dim_selection_strategy_return_t maxAverageDimSelection(region const&, 
+            std::size_t);
 
     numeric_type_t l2norm(point const&);
 
@@ -246,6 +264,9 @@ namespace std
 
 std::ostream& operator<<(std::ostream& os, grid::region const&);
 std::ostream& operator<<(std::ostream& os, grid::point const&);
+std::ostream& operator<<(std::ostream& os, 
+        grid::VERIFICATION_RETURN const&);
+
 
 template <class ArrayLike>
 std::vector<std::size_t> getSortedIndices(ArrayLike const& arr, bool asc = true)
