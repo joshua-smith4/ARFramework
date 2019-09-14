@@ -236,21 +236,29 @@ int main(int argc, char* argv[])
 
     potentiallyUnsafeRegions.push_back(orig_region);
 
+    auto print_count = 0ull;
+    const auto PRINT_PERIOD = 100ull;
     while(!potentiallyUnsafeRegions.empty() || 
             !unsafeRegionsWithAdvExamples.empty())
     {
-        std::cout << "Number of found adversarial examples: " 
-            << foundAdversarialExamples.size() << "\n";
-        std::cout << "Number of potentially unsafe regions: " 
-            << potentiallyUnsafeRegions.size() << "\n";
-        std::cout << "Number of unsafe regions: " 
-            << unsafeRegionsWithAdvExamples.size() << "\n";
-        std::cout << "Number of safe points: " 
-            << numberSafeValidPoints << "\n";
+        if(print_count >= PRINT_PERIOD)
+        {
+            std::cout << "Number of found adversarial examples: " 
+                << foundAdversarialExamples.size() << "\n";
+            std::cout << "Number of potentially unsafe regions: " 
+                << potentiallyUnsafeRegions.size() << "\n";
+            std::cout << "Number of unsafe regions: " 
+                << unsafeRegionsWithAdvExamples.size() << "\n";
+            std::cout << "Number of safe points: " 
+                << numberSafeValidPoints << "\n";
+            print_count = 0ull;
+        }
+        print_count++;
         if(!potentiallyUnsafeRegions.empty())
         {
             auto selected_region = potentiallyUnsafeRegions.back();
             potentiallyUnsafeRegions.pop_back();
+
             selected_region = grid::snapToDomainRange(
                     selected_region,
                     domain_range);
@@ -263,24 +271,25 @@ int main(int argc, char* argv[])
                         granularity_parsed);
             if(numValidPoints > 0)
             {
-                std::cout << "Number of valid points in region: "
-                    << numValidPoints << "\n";
+                //std::cout << "Number of valid points in region: "
+                    //<< numValidPoints << "\n";
             }
             else
             {
-                std::cout << "no valid points in region\n";
+                //std::cout << "no valid points in region\n";
                 continue;
             }
             auto verification_result = 
                 verification_engine(selected_region);
+            /*
             std::cout << "Verification Result: " << 
                 verification_result.first << "\n";
+                */
             if(verification_result.first == 
                     grid::VERIFICATION_RETURN::SAFE)
             {
-                //safeRegions.push_back(selected_region);
-                numberSafeValidPoints +=
-                    numValidPoints;
+                safeRegions.push_back(selected_region);
+                numberSafeValidPoints += numValidPoints;
             }
             else if(verification_result.first == 
                     grid::VERIFICATION_RETURN::UNSAFE)
@@ -360,7 +369,7 @@ int main(int argc, char* argv[])
                         granularity_parsed) 
                     <= 1ull)
             {
-                std::cout << "region has one or fewer valid points\n";
+                //std::cout << "region has one or fewer valid points\n";
                 continue;
             }
             auto subregions = refinement_strategy(

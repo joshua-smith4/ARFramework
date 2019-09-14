@@ -236,7 +236,7 @@ grid::DiscreteSearchVerificationEngine::operator()(
     {
         return {grid::VERIFICATION_RETURN::UNKNOWN, {}};
     }
-    std::cout << "Going to verify entire region\n";
+    //std::cout << "Going to verify entire region\n";
     auto points = discretePointGenerator(r);
     for(auto&& p : points)
     {
