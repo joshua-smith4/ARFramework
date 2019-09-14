@@ -104,6 +104,13 @@ namespace grid
         bool operator()(region const&);
     };
 
+    struct RandomPointRegionAbstraction
+    {
+        explicit RandomPointRegionAbstraction(unsigned);
+        abstraction_strategy_return_t operator()(region const&);
+        unsigned numPoints;
+    };
+
     // abstracts a region to the central point
     abstraction_strategy_return_t 
     centralPointRegionAbstraction(region const&);

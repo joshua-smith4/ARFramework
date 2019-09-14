@@ -1,5 +1,7 @@
 #include <map>
+#include <csignal>
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 
 #include "tensorflow/core/lib/io/path.h"
@@ -12,6 +14,32 @@
 #include "tensorflow_graph_tools.hpp"
 #include "GraphManager.hpp"
 #include "grid_tools.hpp"
+
+void print_point(grid::point const& p)
+{
+    for(auto i = 0u; i < 28; ++i)
+    {
+        for(auto j = 0u; j < 28; ++j)
+        {
+            std::cout << std::fixed << std::setprecision(3) << p[i*28+j] << " ";
+        }
+        std::cout << "\n";
+    }
+}
+
+std::set<grid::point, grid::region_less_compare> 
+    foundAdversarialExamples;
+
+void interrupt_handler(int p)
+{
+    for(auto&& adv_example : foundAdversarialExamples)
+    {
+        std::cout << "######################\n";
+        print_point(adv_example);
+        std::cout << "\n";
+    }
+    exit(1);
+}
 
 
 int main(int argc, char* argv[])
@@ -88,6 +116,13 @@ int main(int argc, char* argv[])
     auto numberOfInputDimensions = init_act_tensor.dims();
     auto flattenedNumDims = 1ull;
 
+    // tmp stuff
+    // --------------
+    std::cout << "########## Inital Point ##########\n";
+    print_point(init_act_point);
+    std::cout << '\n';
+    // --------------
+
     // first dimension is the batch size
     std::vector<int64_t> batch_input_shape(numberOfInputDimensions);
     // this is the size of a single input to the model
@@ -147,7 +182,7 @@ int main(int argc, char* argv[])
                 orig_class);
 
     grid::region_abstraction_strategy_t abstraction_strategy = 
-        grid::centralPointRegionAbstraction;
+        grid::RandomPointRegionAbstraction(20);
     if(hasGradientLayer)
         abstraction_strategy = 
             grid::ModifiedFGSMRegionAbstraction(
@@ -197,14 +232,18 @@ int main(int argc, char* argv[])
                 return class_out == orig_class;
             };
 
+    if(!isPointSafe(init_act_point))
+    {
+        LOG(ERROR) << "Original activation and original class do not agree\n";
+        exit(1);
+    }
+
     auto verification_engine = 
         grid::DiscreteSearchVerificationEngine(
                 discrete_search_attempt_threshold_func,
                 all_valid_discretization_strategy,
                 isPointSafe);
 
-    std::set<grid::point, grid::region_less_compare> 
-        foundAdversarialExamples;
     std::vector<grid::region> potentiallyUnsafeRegions;
     std::vector<grid::region> safeRegions;
     unsigned long long numberSafeValidPoints = 0ull;
@@ -236,8 +275,9 @@ int main(int argc, char* argv[])
 
     potentiallyUnsafeRegions.push_back(orig_region);
 
-    auto print_count = 0ull;
+    auto handle = signal(SIGINT, interrupt_handler);
     const auto PRINT_PERIOD = 100ull;
+    auto print_count = PRINT_PERIOD;
     while(!potentiallyUnsafeRegions.empty() || 
             !unsafeRegionsWithAdvExamples.empty())
     {
@@ -251,6 +291,8 @@ int main(int argc, char* argv[])
                 << unsafeRegionsWithAdvExamples.size() << "\n";
             std::cout << "Number of safe points: " 
                 << numberSafeValidPoints << "\n";
+            std::cout << "Number of safe regions: " 
+                << safeRegions.size() << "\n";
             print_count = 0ull;
         }
         print_count++;

@@ -115,6 +115,31 @@ grid::VolumeThresholdFilterStrategy::operator()(grid::region const& r)
     return volume < threshold;
 }
 
+grid::RandomPointRegionAbstraction::RandomPointRegionAbstraction(
+        unsigned n)
+    : numPoints(n)
+{
+}
+
+grid::abstraction_strategy_return_t 
+grid::RandomPointRegionAbstraction::operator()(region const& r)
+{
+    grid::abstraction_strategy_return_t retVal;
+    std::default_random_engine generator;
+    for(auto i = 0u; i < numPoints; ++i)
+    {
+        grid::point tmp(r.size());
+        for(auto j = 0u; j < r.size(); ++j)
+        {
+            std::uniform_real_distribution<grid::numeric_type_t>
+                dist(r[j].first, r[j].second);
+            tmp[j] = dist(generator);
+        }
+        retVal.push_back(tmp);
+    }
+    return retVal;
+}
+
 grid::abstraction_strategy_return_t 
 grid::centralPointRegionAbstraction(grid::region const& r)
 {
