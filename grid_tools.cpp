@@ -238,6 +238,7 @@ grid::AllValidDiscretizedPointsAbstraction::enumerateAllPoints(
     {
         if(enumerateAllPoints(s, newp, curIndex+1, r))
             s.push_back(newp);
+        if(granularity[curIndex] <= 0.0) break;
         newp[curIndex] += granularity[curIndex];
     }
     return false;
@@ -467,6 +468,7 @@ grid::HierarchicalDimensionRefinementStrategy::enumerateAllRegions(
     {
         if(enumerateAllRegions(s, newr, index+1, selected_dims, orig_region))
             s.insert(newr);
+        if(diff <= 0.0) break;
         newr[curIndex].first = newr[curIndex].second;
         newr[curIndex].second += diff;
     }

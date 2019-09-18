@@ -52,6 +52,7 @@ int main(int argc, char* argv[])
     std::string verification_radius = "verification radius";
     std::string initial_activation = "initial_activation.pb";
     std::string root_dir = ".";
+    std::string number_of_dimensions = "numdimensions";
 
     std::vector<tensorflow::Flag> flag_list = {
         tensorflow::Flag("graph", &graph, "path to protobuf graph to be executed"),
@@ -61,6 +62,7 @@ int main(int argc, char* argv[])
         tensorflow::Flag("granularity", &granularity, "use this option is all dimensions share a discrete range"),
         tensorflow::Flag("verification_radius", &verification_radius, "'radius' of hyperrectangle within which safety is to be verified"),
         tensorflow::Flag("initial_activation", &initial_activation, "initial tested activation"),
+        tensorflow::Flag("number_of_dimensions", &number_of_dimensions, "number of dimensions to verify with provided radius"),
         tensorflow::Flag("root_dir", &root_dir, "root_dir"),
     };
     std::string usage = tensorflow::Flags::Usage(argv[0], flag_list);
@@ -113,6 +115,9 @@ int main(int argc, char* argv[])
     auto init_act_tensor = init_act_tensor_status_pair.second;
     auto init_act_point = graph_tool::tensorToPoint(
             init_act_tensor);
+
+    auto verifySubsetOfDimensions = number_of_dimensions != "numdimensions";
+    auto numDimensionsToVerify = verifySubsetOfDimensions ? atoi(number_of_dimensions.c_str()) : init_act_point.size();
     auto numberOfInputDimensions = init_act_tensor.dims();
     auto flattenedNumDims = 1ull;
 
@@ -162,6 +167,7 @@ int main(int argc, char* argv[])
     for(auto&& elem : batch_input_shape)
         std::cout << elem << " ";
     std::cout << "\n";
+    std::cout << "number_of_dimensions: " << numDimensionsToVerify << "\n";
     std::cout << "verification_radius: " << radius << "\n\n";
 
     /* difference between discrete values of each dimension */
@@ -253,11 +259,28 @@ int main(int argc, char* argv[])
     // create the initial region from the initial activation
     // and the user provided radius
     grid::region orig_region(init_act_point.size());
+    std::vector<unsigned> indices(init_act_point.size());
+    std::iota(indices.begin(), indices.end(), 0);
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(indices.begin(), indices.end(), g);
+
+    std::cout << "Dimensions going to be verified: ";
     for(auto i = 0u; i < init_act_point.size(); ++i)
     {
-        orig_region[i].first = init_act_point[i] - radius;
-        orig_region[i].second = init_act_point[i] + radius;
+        if(i < numDimensionsToVerify)
+        {
+            std::cout << indices[i] << " ";
+            orig_region[indices[i]].first = init_act_point[indices[i]] - radius;
+            orig_region[indices[i]].second = init_act_point[indices[i]] + radius;
+        }
+        else
+        {
+            orig_region[indices[i]].first = init_act_point[indices[i]];
+            orig_region[indices[i]].second = init_act_point[indices[i]];
+        }
     }
+    std::cout << "\n";
 
     grid::region domain_range(orig_region.size());
     for(auto i = 0u; i < domain_range.size(); ++i)
@@ -272,6 +295,10 @@ int main(int argc, char* argv[])
         LOG(ERROR) << "the generated verification region is invalid";
         exit(1);
     }
+    std::cout << "Total number of valid points in verification region: "
+        << grid::AllValidDiscretizedPointsAbstraction
+        ::getNumberValidPoints(orig_region, init_act_point, granularity_parsed)
+        << "\n";
 
     potentiallyUnsafeRegions.push_back(orig_region);
 
@@ -448,6 +475,18 @@ int main(int argc, char* argv[])
         }
     }
 
+    std::cout << "Number of found adversarial examples: " 
+        << foundAdversarialExamples.size() << "\n";
+    std::cout << "Number of potentially unsafe regions: " 
+        << potentiallyUnsafeRegions.size() << "\n";
+    std::cout << "Number of unsafe regions: " 
+        << unsafeRegionsWithAdvExamples.size() << "\n";
+    std::cout << "Number of safe points: " 
+        << numberSafeValidPoints << "\n";
+    std::cout << "Number of safe regions: " 
+        << safeRegions.size() << "\n";
+
+    std::cout << "exiting\n";
     return 0;
 }
 
