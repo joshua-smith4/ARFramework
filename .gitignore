@@ -48,3 +48,5 @@ include/
 pyvenv.cfg
 
 a.out
+
+docs/build
