@@ -1,0 +1,126 @@
+
+digraph R {
+    node [shape=box fontname=Ariel fontsize=10];
+    infobox [shape=plaintext label="Notation" 
+        texlbl="
+        \begin{tabular}{|c|l|}
+            \hline
+            \multicolumn{2}{|c|}{\textbf{Notation}} \\ \hline
+            Symbol & Definition \\ \hline
+            $P$ & Set of unverified regions \\ 
+            $U$ & Set of known unsafe regions \\ 
+            $S$ & Set of safe regions \\ 
+            $|r|, r \in P$ & Number of valid points in $r$ \\ \hline 
+        \end{tabular}
+    "];
+    config [label="Configuration" texlbl="Configuration"];
+    preproc [label="Preprocessing"];
+    p_not_empty [label="r in P,\nP := P - r" texlbl="$r \in P, P := P - r$"];
+    u_not_empty [label="(r, a) in U,\nU := U - {(r, a)}" texlbl="$(r, a) \in U, U := U - \{(r, a)\}$"];
+    verification [label="Verification" texlbl="Verification"];
+    add_safe [label="S := S + r" texlbl="$S := S + r$"];
+    refine_unsafe [label="Partition r into\nR = {r1, r2, ..., rn}"
+        texlbl="Partition r into \break $R = \{r_1, r_2, \hdots , r_n\}$"];
+    find_adv [label="Find a in R,\na lies in rx" 
+        texlbl="Find $a$ in $R$, $a \in r_x$"];
+    fill_p [label="P := P + {r1, r2, ..., rn} - rx"
+        texlbl="$P := P + \{r_1, r_2, \hdots , r_n\} - r_x$"];
+    fill_u [label="U := U + {(rx, a)}"
+        texlbl="$U := U + \{(r_x, a)\}$"];
+    refine_unknown [label="Partition r into\nR = {r1, r2, ..., rn}"
+        texlbl="Partition r into \break $R = \{r_1, r_2, \hdots , r_n\}$"];
+    abstract [
+        label="Abstract ri as a finite\nset of testable points\nA = {a1, ..., an}"
+        texlbl="Abstract $r_i$ as a set $A = \{a_1, \hdots , a_n\}$"];
+    test_a [label="Classify ai through network"];
+    fill_u_a [label="U := U + {(ri, ai)}"
+        texlbl="$U := U + \{(r_i, a_i)\}$"];
+    remove_r_a [label="R := R - ri"
+        texlbl="$R := R - r_i$"];
+    fill_p_r [label="P := P + R"
+        texlbl="$P := P + R$"];
+    end [label="Incremental Report"];
+
+
+    node [shape=diamond fillcolor="yellow" style="filled" width=1.0];
+    if_poru [label="P != {}" texlbl="$P \neq \{\}$"]; 
+    if_empty_r_p [label="|r| > 0" texlbl="$|r| > 0$"];
+    if_empty_r_u [label="|r| > 1" texlbl="$|r| > 1$"];
+
+    node [fillcolor="orange"];
+    main_while [label="while"];
+    for_each_r [label="for each\nri in R"
+        texlbl="$\forall r_i \in R$"];
+    for_each_a [label="for each\nai in A"
+        texlbl="$\forall a_i \in A$"];
+
+    node [shape=circle style="filled" width=0.8 fixedsize=true];
+    safe [label="Safe" fillcolor=green];
+    safe_a [label="Safe" fillcolor=green];
+    unsafe_a [label="Unsafe" fillcolor=red];
+    unsafe [label="Unsafe (a)" fillcolor=red
+        texlbl="Unsafe ($\alpha$)"];
+    unknown [label="Unknown" fillcolor=pink];
+
+    //{rank=same infobox config}
+    infobox -> config [style=invis];
+    config -> preproc;
+    preproc -> main_while;
+    main_while -> if_poru [label="P != {} or U != {}" 
+        texlbl="$P \neq \{\} \lor U \neq \{\}$"];
+
+    {rank=same end main_while}
+    main_while -> end [label="P = {} and U = {} or SIGINT" 
+        texlbl="$P = \{\} \land U = \{\} \lor$ SIGINT"];
+
+    //{rank=same if_poru p_not_empty}
+    if_poru -> p_not_empty [label="true"];
+    if_poru -> u_not_empty [label="false"];
+
+    //{rank=same p_not_empty if_empty_r_p}
+    p_not_empty -> if_empty_r_p;
+    //if_empty_r_p -> p_not_empty [dir="back"];
+
+    //{rank=same u_not_empty if_empty_r_u}
+    u_not_empty -> if_empty_r_u;
+    if_empty_r_u -> main_while [label="false"];
+
+    if_empty_r_p -> main_while [label="false"];
+
+    if_empty_r_p -> verification [label="true"];
+    
+    verification -> unsafe;
+    verification -> unknown;
+
+    {rank=same verification safe unknown}
+    safe -> verification [dir="back"];
+
+    safe -> add_safe;
+    add_safe -> main_while;
+
+    unsafe -> refine_unsafe;
+    refine_unsafe -> find_adv;
+    find_adv -> fill_p;
+    fill_p -> fill_u;
+    fill_u -> main_while;
+
+    unknown -> refine_unknown;
+    refine_unknown -> for_each_r;
+    for_each_r -> abstract [label="loop"];
+    for_each_r -> fill_p_r [label="done"];
+    fill_p_r -> main_while;
+    abstract -> for_each_a;
+    for_each_a -> test_a [label="loop"];
+    test_a -> safe_a;
+    test_a -> unsafe_a;
+    safe_a -> for_each_a;
+    for_each_a -> for_each_r [label="done"];
+    unsafe_a -> fill_u_a;
+    fill_u_a -> remove_r_a;
+    remove_r_a -> for_each_r [label="break"];
+
+    if_empty_r_u -> refine_unsafe [label="true"];
+
+    rankdir=UD;
+}
+
