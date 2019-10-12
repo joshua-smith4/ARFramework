@@ -53,6 +53,7 @@ int main(int argc, char* argv[])
     std::string initial_activation = "initial_activation.pb";
     std::string root_dir = ".";
     std::string number_of_dimensions = "numdimensions";
+    std::string class_averages = "class_averages";
 
     std::vector<tensorflow::Flag> flag_list = {
         tensorflow::Flag("graph", &graph, "path to protobuf graph to be executed"),
@@ -64,7 +65,9 @@ int main(int argc, char* argv[])
         tensorflow::Flag("initial_activation", &initial_activation, "initial tested activation"),
         tensorflow::Flag("number_of_dimensions", &number_of_dimensions, "number of dimensions to verify with provided radius"),
         tensorflow::Flag("root_dir", &root_dir, "root_dir"),
+        tensorflow::Flag("class_averages", &class_averages, "the class averages of the training data (optional - used for FGSM)")
     };
+
     std::string usage = tensorflow::Flags::Usage(argv[0], flag_list);
 
     const bool parse_result = tensorflow::Flags::Parse(&argc, argv, flag_list);
@@ -100,6 +103,7 @@ int main(int argc, char* argv[])
         exit(1);
     }
 
+    
     std::string initial_activation_path = 
         tensorflow::io::JoinPath(root_dir, initial_activation);
     auto init_act_tensor_status_pair = 
@@ -180,12 +184,28 @@ int main(int argc, char* argv[])
 
     grid::dimension_selection_strategy_t dimension_selection_strategy = 
         grid::randomDimSelection;
-    if(hasGradientLayer)
+    auto hasAveragesProto = class_averages != "class_averages";
+    if(hasGradientLayer && hasAveragesProto)
+    {
+        
+        std::string class_averages_path = 
+            tensorflow::io::JoinPath(root_dir, class_averages);
+        auto class_averages_proto_pair = 
+            GraphManager::ReadBinaryTensorProto(class_averages_path);
+        if(!class_averages_proto_pair.first)
+        {
+            LOG(ERROR) << "Unable to read class averages proto";
+            exit(1);
+        }
+        auto averages = graph_tool::tensorToPoints(
+                class_averages_proto_pair.second);
+        std::cout << averages.size() << "\n";
         dimension_selection_strategy = 
             grid::IntellifeatureDimSelection(
-                {}, // TODO: fill with class averages
+                averages,
                 &grid::l2norm,
                 orig_class);
+    }
 
     grid::region_abstraction_strategy_t abstraction_strategy = 
         grid::RandomPointRegionAbstraction(20);

@@ -70,7 +70,7 @@ def convertGraph( modelPath, outdir, numoutputs, prefix, name):
     from tensorflow.python.framework import graph_io
     constant_graph = graph_util.convert_variables_to_constants(sess, sess.graph.as_graph_def(), pred_node_names)
     graph_io.write_graph(constant_graph, outdir, name, as_text=False)
-    print('Saved the constant graph (ready for inference) at: ', osp.join(outdir, name))
+    print('Saved the constant graph (ready for inference) at: ', os.join(outdir, name))
 
 if __name__ == '__main__':
 
