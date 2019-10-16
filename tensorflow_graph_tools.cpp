@@ -62,7 +62,7 @@ std::vector<grid::point> graph_tool::tensorToPoints(
 {
     std::vector<grid::point> retVal;
     auto numPoints = t.dim_size(0);
-    auto pointLength = 1;
+    auto pointLength = 1u;
     for(auto i = 1u; i < t.dims(); ++i)
         pointLength *= t.dim_size(i);
     auto flattened = t.flat<float>();

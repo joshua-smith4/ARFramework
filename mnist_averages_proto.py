@@ -14,14 +14,8 @@ input_shape = (img_rows, img_cols, 1)
 
 x_train = x_train.astype('float32')
 x_train /= 255.0
-
 counts = np.zeros(10)
-print(counts.shape)
-avg = np.zeros((10,)+x_train[0].shape)
-print(avg.shape)
-print(type(x_train))
-print(x_train.shape)
-print(y_train.shape)
+avg = np.zeros((10,)+x_train[0].shape, dtype=np.float32)
 for i in range(len(y_train)):
     counts[y_train[i]] += 1
     avg[y_train[i]] += x_train[i]

@@ -262,7 +262,6 @@ grid::DiscreteSearchVerificationEngine::operator()(
     {
         return {grid::VERIFICATION_RETURN::UNKNOWN, {}};
     }
-    //std::cout << "Going to verify entire region\n";
     auto points = discretePointGenerator(r);
     for(auto&& p : points)
     {
@@ -391,9 +390,9 @@ grid::ModifiedFGSMRegionAbstraction::operator()(grid::region const& r)
     auto max_radius = 
         (min_dimension->second - min_dimension->first) / (long double)2.0;
     auto e2_lowerbound = (long double)1.00001;
-    auto e2_upperbound = 1.1;
-    auto e1_lowerbound = (long double)0.00001;
-    auto e1_upperbound = max_radius / ((long double)1.0 + e2_upperbound);
+    auto e2_upperbound = 1.001;
+    auto e1_lowerbound = (long double)0.001;
+    auto e1_upperbound = max_radius / e2_upperbound;
 
     std::default_random_engine rand_gen;
     auto dist_e1 = 
@@ -421,8 +420,7 @@ grid::ModifiedFGSMRegionAbstraction::operator()(grid::region const& r)
                 elementWiseMult(grad_sign,M) + constVecMult(
                     e2, 
                     elementWiseMult(R,Mnot)));
-        if(grid::pointIsInRegion(r, generated_point))
-            retVal.push_back(generated_point);
+        retVal.push_back(generated_point);
     }
     return retVal;
 }

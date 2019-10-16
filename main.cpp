@@ -54,6 +54,8 @@ int main(int argc, char* argv[])
     std::string root_dir = ".";
     std::string number_of_dimensions = "numdimensions";
     std::string class_averages = "class_averages";
+    std::string label_proto = "label_proto";
+    std::string label_layer = "label_layer_placeholder";
 
     std::vector<tensorflow::Flag> flag_list = {
         tensorflow::Flag("graph", &graph, "path to protobuf graph to be executed"),
@@ -65,7 +67,9 @@ int main(int argc, char* argv[])
         tensorflow::Flag("initial_activation", &initial_activation, "initial tested activation"),
         tensorflow::Flag("number_of_dimensions", &number_of_dimensions, "number of dimensions to verify with provided radius"),
         tensorflow::Flag("root_dir", &root_dir, "root_dir"),
-        tensorflow::Flag("class_averages", &class_averages, "the class averages of the training data (optional - used for FGSM)")
+        tensorflow::Flag("class_averages", &class_averages, "the class averages of the training data (optional - used for FGSM)"),
+        tensorflow::Flag("label_proto", &label_proto, "protocol buffer of label image corresponding with initial activation"),
+        tensorflow::Flag("label_layer", &label_layer, "name of label layer")
     };
 
     std::string usage = tensorflow::Flags::Usage(argv[0], flag_list);
@@ -102,7 +106,6 @@ int main(int argc, char* argv[])
         LOG(ERROR) << "Error during construction";
         exit(1);
     }
-
     
     std::string initial_activation_path = 
         tensorflow::io::JoinPath(root_dir, initial_activation);
@@ -184,10 +187,25 @@ int main(int argc, char* argv[])
 
     grid::dimension_selection_strategy_t dimension_selection_strategy = 
         grid::randomDimSelection;
+
+    grid::dimension_selection_strategy_t 
+        intellifeature_selection_strategy = 
+        grid::randomDimSelection;
+
+    grid::region_abstraction_strategy_t abstraction_strategy = 
+        grid::RandomPointRegionAbstraction(20);
+
     auto hasAveragesProto = class_averages != "class_averages";
-    if(hasGradientLayer && hasAveragesProto)
+    auto hasLabelProto = label_proto != "label_proto";
+    auto hasLabelLayer = label_layer != "label_layer_placeholder";
+    auto canUseGradient = 
+        hasGradientLayer 
+        && hasAveragesProto 
+        && hasLabelProto 
+        && hasLabelLayer;
+
+    if(canUseGradient)
     {
-        
         std::string class_averages_path = 
             tensorflow::io::JoinPath(root_dir, class_averages);
         auto class_averages_proto_pair = 
@@ -199,30 +217,43 @@ int main(int argc, char* argv[])
         }
         auto averages = graph_tool::tensorToPoints(
                 class_averages_proto_pair.second);
-        std::cout << averages.size() << "\n";
-        dimension_selection_strategy = 
+        intellifeature_selection_strategy = 
             grid::IntellifeatureDimSelection(
                 averages,
                 &grid::l2norm,
                 orig_class);
-    }
-
-    grid::region_abstraction_strategy_t abstraction_strategy = 
-        grid::RandomPointRegionAbstraction(20);
-    if(hasGradientLayer)
+        auto label_tensor_path = 
+            tensorflow::io::JoinPath(root_dir, label_proto);
+        auto label_tensor_pair =
+            GraphManager::ReadBinaryTensorProto(label_tensor_path);
+        if(!label_tensor_pair.first)
+        {
+            LOG(ERROR) << "Unable to read label proto";
+            exit(1);
+        }
+        auto label_tensor = label_tensor_pair.second;
         abstraction_strategy = 
             grid::ModifiedFGSMRegionAbstraction(
-                20u,
-                [&](grid::point const& p) -> grid::point
+                2u,
+                [&,label_tensor_copy = label_tensor]
+                (grid::point const& p) -> grid::point
                 {
+                    auto createGradientFeedDict = 
+                    [&]() -> graph_tool::feed_dict_type_t
+                    {
+                        auto p_tensor = 
+                        graph_tool::pointToTensor(p, batch_input_shape);
+                        return {{input_layer, p_tensor},
+                            {label_layer, label_tensor_copy}};
+                    };
                     return gm.feedThroughModel(
-                            std::bind(graph_tool::makeFeedDict, 
-                                input_layer, p, batch_input_shape),
+                            createGradientFeedDict,
                             graph_tool::parseGraphOutToVector,
                             {gradient_layer});
                 },
-                dimension_selection_strategy,
-                0.8);
+                intellifeature_selection_strategy,
+                1.0);
+    }
 
     grid::region_refinement_strategy_t refinement_strategy = 
         grid::HierarchicalDimensionRefinementStrategy(
@@ -279,26 +310,24 @@ int main(int argc, char* argv[])
     // create the initial region from the initial activation
     // and the user provided radius
     grid::region orig_region(init_act_point.size());
-    std::vector<unsigned> indices(init_act_point.size());
-    std::iota(indices.begin(), indices.end(), 0);
-    std::random_device rd;
-    std::mt19937 g(rd());
-    std::shuffle(indices.begin(), indices.end(), g);
-
-    std::cout << "Dimensions going to be verified: ";
-    for(auto i = 0u; i < init_act_point.size(); ++i)
+    for(auto i = 0u; i < orig_region.size(); ++i)
     {
-        if(i < numDimensionsToVerify)
-        {
-            std::cout << indices[i] << " ";
-            orig_region[indices[i]].first = init_act_point[indices[i]] - radius;
-            orig_region[indices[i]].second = init_act_point[indices[i]] + radius;
-        }
-        else
-        {
-            orig_region[indices[i]].first = init_act_point[indices[i]];
-            orig_region[indices[i]].second = init_act_point[indices[i]];
-        }
+        orig_region[i].first = 
+            init_act_point[i] - radius;
+        orig_region[i].second = 
+            init_act_point[i] + radius;
+    }
+    auto selected_dimensions = 
+        intellifeature_selection_strategy(
+                orig_region, 
+                init_act_point.size());
+
+    for(auto i = numDimensionsToVerify; i < selected_dimensions.size(); ++i)
+    {
+        orig_region[selected_dimensions[i]].first = 
+            init_act_point[selected_dimensions[i]];
+        orig_region[selected_dimensions[i]].second = 
+            init_act_point[selected_dimensions[i]];
     }
     std::cout << "\n";
 
@@ -358,22 +387,9 @@ int main(int argc, char* argv[])
                         selected_region,
                         init_act_point,
                         granularity_parsed);
-            if(numValidPoints > 0)
-            {
-                //std::cout << "Number of valid points in region: "
-                    //<< numValidPoints << "\n";
-            }
-            else
-            {
-                //std::cout << "no valid points in region\n";
-                continue;
-            }
+            if(numValidPoints <= 0) continue;
             auto verification_result = 
                 verification_engine(selected_region);
-            /*
-            std::cout << "Verification Result: " << 
-                verification_result.first << "\n";
-                */
             if(verification_result.first == 
                     grid::VERIFICATION_RETURN::SAFE)
             {
@@ -410,6 +426,7 @@ int main(int argc, char* argv[])
                 {
                     auto abstracted_points = 
                         abstraction_strategy(subregion);
+                    std::cout << "abstracted points: " << abstracted_points.size() << "\n";
                     for(auto&& pt : abstracted_points)
                     {
                         auto snapped_pt = grid::snapToDomainRange(
@@ -429,8 +446,10 @@ int main(int argc, char* argv[])
                         }
                     }
                 }
+                //std::cout << "about to enter all abstracted points\n";
                 for(auto&& pt : all_abstracted_points)
                 {
+                    //print_point(pt);
                     auto found_subregion = subregions.find(pt);
                     if(found_subregion == subregions.end()) continue;
                     foundAdversarialExamples.insert(pt);

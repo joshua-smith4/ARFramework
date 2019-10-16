@@ -1,5 +1,7 @@
-from keras.datasets import mnist
-from keras import backend as K
+from tensorflow.keras.datasets import mnist
+from tensorflow.keras import backend as K
+import tensorflow as tf
+import numpy as np
 
 (x_train, y_train), (x_test, y_test) = mnist.load_data()
 
@@ -16,28 +18,30 @@ else:
     input_shape = (img_rows, img_cols, 1)
 
 x_train = x_train.astype('float32')
-x_test = x_test.astype('float32')
 x_train /= 255
-x_test /= 255
 
-index = 1000
+y_train = tf.keras.utils.to_categorical(y_train, 10)
+
+index = 100
 x_init = x_train[index:index+1]
-print(y_train[index])
+y_init = y_train[index:index+1]
 
-import tensorflow as tf
+file_name_x = 'mnist_{}.pb'.format(index) 
+file_name_y = 'mnist_{}_label.pb'.format(index) 
 
-file_name = 'mnist_{}.pb'.format(index) 
-x_proto = tf.make_tensor_proto(x_init, dtype=x_init.dtype, shape=x_init.shape)
-with open(file_name, 'wb') as f:
+x_proto = tf.make_tensor_proto(
+        x_init, dtype=x_init.dtype, shape=x_init.shape)
+
+y_proto = tf.make_tensor_proto(
+        y_init, dtype=y_init.dtype, shape=y_init.shape)
+
+with open(file_name_x, 'wb') as f:
     f.write(x_proto.SerializeToString())
 
+with open(file_name_y, 'wb') as f:
+    f.write(y_proto.SerializeToString())
+
 x_proto_deserial = tf.make_tensor_proto(0)
-with open(file_name, 'rb') as f:
+with open(file_name_x, 'rb') as f:
     x_proto_deserial.ParseFromString(f.read())
 
-print(x_proto_deserial)
-
-x = tf.convert_to_tensor(x_proto_deserial)
-
-with tf.Session() as sess:
-    print(x.eval(session=sess))

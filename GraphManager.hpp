@@ -1,6 +1,7 @@
 #ifndef GRAPH_MANAGER_HPP_INCLUDED
 #define GRAPH_MANAGER_HPP_INCLUDED
 
+#include <iostream>
 #include <fstream>
 #include <utility>
 #include <vector>
@@ -46,7 +47,8 @@ public:
             outputs.clear();
             errorOccurred = true;
         }
-        return out_func(outputs);
+        auto outs = out_func(outputs);
+        return outs;
     }
     inline bool ok() { return !errorOccurred; }
     inline void resetErrorFlag() { errorOccurred = false; }
