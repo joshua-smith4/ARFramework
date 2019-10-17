@@ -56,6 +56,7 @@ int main(int argc, char* argv[])
     std::string class_averages = "class_averages";
     std::string label_proto = "label_proto";
     std::string label_layer = "label_layer_placeholder";
+    std::string fgsm_balance_factor_opt = "0.95";
 
     std::vector<tensorflow::Flag> flag_list = {
         tensorflow::Flag("graph", &graph, "path to protobuf graph to be executed"),
@@ -69,7 +70,8 @@ int main(int argc, char* argv[])
         tensorflow::Flag("root_dir", &root_dir, "root_dir"),
         tensorflow::Flag("class_averages", &class_averages, "the class averages of the training data (optional - used for FGSM)"),
         tensorflow::Flag("label_proto", &label_proto, "protocol buffer of label image corresponding with initial activation"),
-        tensorflow::Flag("label_layer", &label_layer, "name of label layer")
+        tensorflow::Flag("label_layer", &label_layer, "name of label layer"),
+        tensorflow::Flag("fgsm_balance_factor", &fgsm_balance_factor_opt, "Balance factor for modified FGSM algorithm (ratio dimensions fgsm/random)")
     };
 
     std::string usage = tensorflow::Flags::Usage(argv[0], flag_list);
@@ -97,7 +99,8 @@ int main(int argc, char* argv[])
         LOG(ERROR) << "Must provide verification radius.";
         return -1;
     }
-    auto radius = radiusProvided ? atof(verification_radius.c_str()) : 0.5;
+    auto radius = radiusProvided ? std::atof(verification_radius.c_str()) : 0.5;
+    auto fgsm_balance_factor = std::atof(fgsm_balance_factor_opt.c_str());
 
     std::string graph_path = tensorflow::io::JoinPath(root_dir, graph);
     GraphManager gm(graph_path);
@@ -234,7 +237,7 @@ int main(int argc, char* argv[])
         auto label_tensor = label_tensor_pair.second;
         abstraction_strategy = 
             grid::ModifiedFGSMRegionAbstraction(
-                2u,
+                5u,
                 [&,label_tensor_copy = label_tensor]
                 (grid::point const& p) -> grid::point
                 {
@@ -252,7 +255,7 @@ int main(int argc, char* argv[])
                             {gradient_layer});
                 },
                 intellifeature_selection_strategy,
-                1.0);
+                fgsm_balance_factor);
     }
 
     grid::region_refinement_strategy_t refinement_strategy = 
@@ -426,7 +429,7 @@ int main(int argc, char* argv[])
                 {
                     auto abstracted_points = 
                         abstraction_strategy(subregion);
-                    std::cout << "abstracted points: " << abstracted_points.size() << "\n";
+                    //std::cout << "abstracted points: " << abstracted_points.size() << "\n";
                     for(auto&& pt : abstracted_points)
                     {
                         auto snapped_pt = grid::snapToDomainRange(

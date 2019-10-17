@@ -389,10 +389,10 @@ grid::ModifiedFGSMRegionAbstraction::operator()(grid::region const& r)
                 { return a.second - a.first < b.second - b.first; });
     auto max_radius = 
         (min_dimension->second - min_dimension->first) / (long double)2.0;
-    auto e2_lowerbound = (long double)1.00001;
-    auto e2_upperbound = 1.001;
-    auto e1_lowerbound = (long double)0.001;
-    auto e1_upperbound = max_radius / e2_upperbound;
+    auto e1_lowerbound = (long double)0.00005;
+    auto e1_upperbound = (long double)max_radius;
+    auto e2_lowerbound = (long double)0.0;
+    auto e2_upperbound = (long double)max_radius / e1_lowerbound - 1.0;
 
     std::default_random_engine rand_gen;
     auto dist_e1 = 
@@ -415,11 +415,17 @@ grid::ModifiedFGSMRegionAbstraction::operator()(grid::region const& r)
             elem = dist_R(rand_gen);
             if(elem != 1) elem = -1;
         }
-        auto generated_point = constVecMult(
-                e1, 
-                elementWiseMult(grad_sign,M) + constVecMult(
-                    e2, 
-                    elementWiseMult(R,Mnot)));
+        auto fgsm_part = elementWiseMult(grad_sign, M);
+        auto mod_part = constVecMult(e2, elementWiseMult(R, Mnot));
+        auto scaled_part = constVecMult(e1, fgsm_part + mod_part);
+        auto generated_point = p + scaled_part;
+        /*
+        if(!grid::isInDomainRange(generated_point, r))
+        {
+            std::cout << "out of range\n";
+            continue;
+        }
+        */
         retVal.push_back(generated_point);
     }
     return retVal;
