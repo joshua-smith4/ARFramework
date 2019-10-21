@@ -18,7 +18,7 @@ label_layer = tf.stop_gradient(label_layer, name="stopped_gradient_label")
 
 conv1 = tf.layers.conv2d(
         inputs=input_layer,
-        filters=32,
+        filters=64,
         kernel_size=[5, 5],
         padding="same",
         activation=tf.nn.relu,
@@ -28,16 +28,28 @@ pool1 = tf.layers.max_pooling2d(inputs=conv1, pool_size=[2, 2], strides=2, name=
 
 conv2 = tf.layers.conv2d(
         inputs=pool1,
-        filters=64,
+        filters=128,
         kernel_size=[3, 3],
         padding="same",
         activation=tf.nn.relu,
         name='conv_2')
 
+#norm1 = tf.nn.l2_normalize(conv2)
+
 pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[2, 2], strides=2, name='pool_2')
 
-print(pool2.shape)
-flattened = tf.reshape(pool2, [-1, 8*8*64], name='flattened')
+conv3 = tf.layers.conv2d(
+        inputs=pool2,
+        filters=256,
+        kernel_size=[3, 3],
+        padding="same",
+        activation=tf.nn.relu,
+        name='conv_3')
+
+pool3 = tf.layers.max_pooling2d(inputs=conv3, pool_size=[2, 2], strides=2, name='pool_3')
+
+flat_shape = [-1] + [np.prod(pool3.shape[1:])]
+flattened = tf.reshape(pool3, flat_shape, name='flattened')
 
 dense = tf.layers.dense(
         inputs=flattened, units=1024, activation=tf.nn.relu, name='dense_1')
@@ -57,6 +69,7 @@ correct = tf.nn.in_top_k(logits, tf.argmax(label_layer, axis=1), 1)
 accuracy = tf.reduce_mean(tf.cast(correct, tf.float32))
 
 (x_train, y_train), (x_test, y_test) = cifar10.load_data()
+print(np.max(x_train))
 print(x_train.shape, y_train.shape, x_test.shape, y_test.shape)
 
 y_train = tf.keras.utils.to_categorical(y_train, 10)
@@ -89,7 +102,7 @@ with open(file_name_x, 'wb') as f:
 with open(file_name_y, 'wb') as f:
     f.write(y_proto.SerializeToString())
 
-epochs = 10
+epochs = 200
 batch_size = 100
 
 init = tf.global_variables_initializer()
