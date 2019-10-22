@@ -15,18 +15,6 @@
 #include "GraphManager.hpp"
 #include "grid_tools.hpp"
 
-void print_point(grid::point const& p)
-{
-    for(auto i = 0u; i < 28; ++i)
-    {
-        for(auto j = 0u; j < 28; ++j)
-        {
-            std::cout << std::fixed << std::setprecision(3) << p[i*28+j] << " ";
-        }
-        std::cout << "\n";
-    }
-}
-
 std::set<grid::point, grid::region_less_compare> 
     foundAdversarialExamples;
 
@@ -34,9 +22,7 @@ void interrupt_handler(int p)
 {
     for(auto&& adv_example : foundAdversarialExamples)
     {
-        std::cout << "######################\n";
-        print_point(adv_example);
-        std::cout << "\n";
+        std::cout << "Found adv example\n";
     }
     exit(1);
 }
@@ -126,6 +112,7 @@ int main(int argc, char* argv[])
     auto init_act_point = graph_tool::tensorToPoint(
             init_act_tensor);
 
+
     auto verifySubsetOfDimensions = number_of_dimensions != "numdimensions";
     auto numDimensionsToVerify = verifySubsetOfDimensions ? atoi(number_of_dimensions.c_str()) : init_act_point.size();
     auto numberOfInputDimensions = init_act_tensor.dims();
@@ -134,8 +121,8 @@ int main(int argc, char* argv[])
     // tmp stuff
     // --------------
     std::cout << "########## Inital Point ##########\n";
-    print_point(init_act_point);
-    std::cout << '\n';
+    std::cout << init_act_point.size() << "\n";
+    std::cout << numberOfInputDimensions << "\n";
     // --------------
 
     // first dimension is the batch size
@@ -150,17 +137,31 @@ int main(int argc, char* argv[])
         flattenedNumDims *= batch_input_shape[i];
     }
 
+    /*
+    auto back_check = graph_tool::pointToTensor(init_act_point,
+            batch_input_shape);
+
+    auto btmp = back_check.flat<float>();
+    auto tmp = init_act_tensor.flat<float>();
+    for(auto i = 0u; i < tmp.size(); ++i)
+    {
+        std::cout << btmp(i) << " " << tmp(i) << "\n";
+    }
+    */
+
     auto retFeedDict = [&]()
         ->std::vector<std::pair<std::string, tensorflow::Tensor>>
     {
         return {{input_layer, init_act_tensor}};
     };
 
+    std::cout << "about to feed in init activation\n";
     auto logits_init_activation = 
         gm.feedThroughModel(
                 retFeedDict, 
                 &graph_tool::parseGraphOutToVector, 
                 {output_layer});
+    std::cout << "done\n";
     if(!gm.ok())
     {
         LOG(ERROR) << "Error while feeding through model";
@@ -170,6 +171,24 @@ int main(int argc, char* argv[])
     unsigned orig_class = 
         graph_tool::getClassOfClassificationVector(logits_init_activation);
 
+    for(auto i = 0u; i < 10u; ++i)
+    {
+        auto tmp = 
+            gm.feedThroughModel(
+                    retFeedDict, 
+                    &graph_tool::parseGraphOutToVector, 
+                    {output_layer});
+        if(!gm.ok())
+        {
+            LOG(ERROR) << "Error while feeding through model";
+            exit(1);
+        }
+        unsigned tmp_class = 
+            graph_tool::getClassOfClassificationVector(tmp);
+
+        if(tmp_class != orig_class)
+            std::cout << tmp_class << " " << orig_class << "\n";
+    }
 
     std::cout << "granularity: " << granularityVal << "\n";
     std::cout << "original class: " << orig_class << "\n";
@@ -289,6 +308,7 @@ int main(int argc, char* argv[])
                         {output_layer});
                 auto class_out = 
                     graph_tool::getClassOfClassificationVector(logits_out);
+                std::cout << "class of initial activation: " << class_out << "\n";
                 return class_out == orig_class;
             };
 
@@ -354,6 +374,7 @@ int main(int argc, char* argv[])
 
     potentiallyUnsafeRegions.push_back(orig_region);
 
+    std::cout << "about to start main process\n";
     auto handle = signal(SIGINT, interrupt_handler);
     const auto PRINT_PERIOD = 100ull;
     auto print_count = PRINT_PERIOD;
