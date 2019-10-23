@@ -10,7 +10,7 @@ num_classes = 10
 
 input_layer = tf.placeholder(tf.float32, shape=(None, 32, 32, 3), name='input_layer_x')
 
-input_layer = tf.stop_gradient(input_layer, name="stopped_gradient_input")
+#input_layer = tf.stop_gradient(input_layer, name="stopped_gradient_input")
 
 label_layer = tf.placeholder(tf.float32, shape=(None, 10), name='label_layer_y')
 
@@ -102,8 +102,8 @@ with open(file_name_x, 'wb') as f:
 with open(file_name_y, 'wb') as f:
     f.write(y_proto.SerializeToString())
 
-epochs = 200
-batch_size = 100
+epochs = 20
+batch_size = 200
 
 init = tf.global_variables_initializer()
 with tf.Session() as sess:
@@ -119,7 +119,10 @@ with tf.Session() as sess:
                 input_layer: x_batch, label_layer: y_batch})
         acc_test = accuracy.eval(feed_dict={
             input_layer: x_test, label_layer: y_test})
+        acc_train = accuracy.eval(feed_dict={
+            input_layer: x_train, label_layer: y_train})
         print(epoch, "Test accuracy:", acc_test)
+        print(epoch, "Test accuracy:", acc_train)
 
     constant_graph = graph_util.convert_variables_to_constants(
             sess, 
