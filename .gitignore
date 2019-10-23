@@ -50,3 +50,4 @@ pyvenv.cfg
 a.out
 
 docs/build
+*.pb
