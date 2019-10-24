@@ -155,13 +155,11 @@ int main(int argc, char* argv[])
         return {{input_layer, init_act_tensor}};
     };
 
-    std::cout << "about to feed in init activation\n";
     auto logits_init_activation = 
         gm.feedThroughModel(
                 retFeedDict, 
                 &graph_tool::parseGraphOutToVector, 
                 {output_layer});
-    std::cout << "done\n";
     if(!gm.ok())
     {
         LOG(ERROR) << "Error while feeding through model";
@@ -171,7 +169,7 @@ int main(int argc, char* argv[])
     unsigned orig_class = 
         graph_tool::getClassOfClassificationVector(logits_init_activation);
 
-    for(auto i = 0u; i < 10u; ++i)
+    for(auto i = 0u; i < 20u; ++i)
     {
         auto tmp = 
             gm.feedThroughModel(
@@ -188,6 +186,8 @@ int main(int argc, char* argv[])
 
         if(tmp_class != orig_class)
             std::cout << tmp_class << " " << orig_class << "\n";
+        else
+            std::cout << "good\n";
     }
 
     std::cout << "granularity: " << granularityVal << "\n";

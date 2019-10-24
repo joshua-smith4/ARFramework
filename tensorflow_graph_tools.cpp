@@ -9,7 +9,7 @@ unsigned graph_tool::getClassOfClassificationTensor(
     maxVal = flattened(0);
     for(auto i = 0u; i < flattened.size(); ++i)
     {
-        if(flattened(i) > maxVal)
+        if(flattened(i) >= maxVal)
         {
             maxVal = flattened(i);
             retVal = i;

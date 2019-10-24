@@ -10,7 +10,6 @@ num_classes = 10
 
 input_layer = tf.placeholder(tf.float32, shape=(None, 32, 32, 3), name='input_layer_x')
 
-#input_layer = tf.stop_gradient(input_layer, name="stopped_gradient_input")
 
 label_layer = tf.placeholder(tf.float32, shape=(None, 10), name='label_layer_y')
 
@@ -34,8 +33,6 @@ conv2 = tf.layers.conv2d(
         activation=tf.nn.relu,
         name='conv_2')
 
-#norm1 = tf.nn.l2_normalize(conv2)
-
 pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[2, 2], strides=2, name='pool_2')
 
 conv3 = tf.layers.conv2d(
@@ -54,9 +51,7 @@ flattened = tf.reshape(pool3, flat_shape, name='flattened')
 dense = tf.layers.dense(
         inputs=flattened, units=1024, activation=tf.nn.relu, name='dense_1')
 
-dropout = tf.nn.dropout(dense, rate=0.4, name='dropout_1')
-
-logits = tf.layers.dense(inputs=dropout, units=10, name='logits')
+logits = tf.layers.dense(inputs=dense, units=10, name='logits')
 classes = tf.argmax(input=logits, axis=1, name='classes')
 probabilities = tf.nn.softmax(logits, name="probabilities_out")
 loss = tf.nn.softmax_cross_entropy_with_logits(labels=label_layer, logits=logits, name='loss_func')
@@ -79,8 +74,10 @@ print(y_train.shape, y_test.shape)
 x_train = x_train.astype('float32')
 x_test = x_test.astype('float32')
 
-x_train /= 255.0
-x_test /= 255.0
+x_train = x_train / np.float32(255.0)
+x_test = x_test / np.float32(255.0)
+
+print(x_train.dtype, x_test.dtype)
 
 index = 100
 
@@ -122,7 +119,7 @@ with tf.Session() as sess:
         acc_train = accuracy.eval(feed_dict={
             input_layer: x_train, label_layer: y_train})
         print(epoch, "Test accuracy:", acc_test)
-        print(epoch, "Test accuracy:", acc_train)
+        print(epoch, "Train accuracy:", acc_train)
 
     constant_graph = graph_util.convert_variables_to_constants(
             sess, 

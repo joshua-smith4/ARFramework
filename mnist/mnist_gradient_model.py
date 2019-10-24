@@ -81,3 +81,4 @@ with tf.Session() as sess:
             ['probabilities_out', 'gradient_out'])
 
     graph_io.write_graph(constant_graph, '.', 'mnist_gradient.pb', as_text=False)
+
