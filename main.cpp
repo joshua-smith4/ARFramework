@@ -20,7 +20,7 @@ std::set<grid::point, grid::region_less_compare>
 
 void interrupt_handler(int p)
 {
-    std::cout << "Found " << foundAvdversarialExamples.size() << " adversarial examples\n";
+    std::cout << "Found " << foundAdversarialExamples.size() << " adversarial examples\n";
     exit(1);
 }
 
