@@ -211,6 +211,7 @@ int main(int argc, char* argv[])
 
     if(canUseGradient)
     {
+        std::cout << "Using IntellifeatureFGSM\n";
         std::string class_averages_path = 
             tensorflow::io::JoinPath(root_dir, class_averages);
         auto class_averages_proto_pair = 
