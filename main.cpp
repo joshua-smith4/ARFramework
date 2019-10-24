@@ -197,8 +197,12 @@ int main(int argc, char* argv[])
         intellifeature_selection_strategy = 
         grid::randomDimSelection;
 
+    /*
     grid::region_abstraction_strategy_t abstraction_strategy = 
-        grid::RandomPointRegionAbstraction(20);
+        grid::RandomPointRegionAbstraction(1u);
+    */
+    grid::region_abstraction_strategy_t abstraction_strategy = 
+        grid::centralPointRegionAbstraction;
 
     auto hasAveragesProto = class_averages != "class_averages";
     auto hasLabelProto = label_proto != "label_proto";
@@ -240,7 +244,7 @@ int main(int argc, char* argv[])
         auto label_tensor = label_tensor_pair.second;
         abstraction_strategy = 
             grid::ModifiedFGSMRegionAbstraction(
-                5u,
+                1u,
                 [&,label_tensor_copy = label_tensor]
                 (grid::point const& p) -> grid::point
                 {
@@ -264,8 +268,8 @@ int main(int argc, char* argv[])
     grid::region_refinement_strategy_t refinement_strategy = 
         grid::HierarchicalDimensionRefinementStrategy(
                 dimension_selection_strategy,
-                2,
-                8);
+                2u,
+                5u);
 
     auto all_valid_discretization_strategy = 
         grid::AllValidDiscretizedPointsAbstraction(
@@ -292,7 +296,6 @@ int main(int argc, char* argv[])
                         {output_layer});
                 auto class_out = 
                     graph_tool::getClassOfClassificationVector(logits_out);
-                std::cout << "class of initial activation: " << class_out << "\n";
                 return class_out == orig_class;
             };
 
@@ -353,12 +356,11 @@ int main(int argc, char* argv[])
     }
     std::cout << "Total number of valid points in verification region: "
         << grid::AllValidDiscretizedPointsAbstraction
-        ::getNumberValidPoints(orig_region, init_act_point, granularity_parsed)
+            ::getNumberValidPoints(orig_region, init_act_point, granularity_parsed)
         << "\n";
 
     potentiallyUnsafeRegions.push_back(orig_region);
 
-    std::cout << "about to start main process\n";
     auto handle = signal(SIGINT, interrupt_handler);
     const auto PRINT_PERIOD = 100ull;
     auto print_count = PRINT_PERIOD;
@@ -434,7 +436,6 @@ int main(int argc, char* argv[])
                 {
                     auto abstracted_points = 
                         abstraction_strategy(subregion);
-                    //std::cout << "abstracted points: " << abstracted_points.size() << "\n";
                     for(auto&& pt : abstracted_points)
                     {
                         auto snapped_pt = grid::snapToDomainRange(
@@ -454,13 +455,14 @@ int main(int argc, char* argv[])
                         }
                     }
                 }
-                //std::cout << "about to enter all abstracted points\n";
                 for(auto&& pt : all_abstracted_points)
                 {
-                    //print_point(pt);
+                    if(isPointSafe(pt)) continue;
                     auto found_subregion = subregions.find(pt);
-                    if(found_subregion == subregions.end()) continue;
-                    foundAdversarialExamples.insert(pt);
+                    if(found_subregion == subregions.end())
+                    {
+                        continue;
+                    }
                     unsafeRegionsTmp.insert({*found_subregion, pt});
                     subregions.erase(found_subregion);
                 }
