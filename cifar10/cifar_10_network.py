@@ -1,9 +1,17 @@
 import tensorflow as tf
 import numpy as np
+import argparse
 from tensorflow.python.framework import graph_util
 from tensorflow.python.framework import graph_io
 from tensorflow.keras.datasets import cifar10
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--epochs', type=int, default=100)
+parser.add_argument('--index', type=int, default=100)
+parser.add_argument('--batch_size', type=int, default=200)
+parser.add_argument('--save_train', type=int, default=1)
+args = parser.parse_args()
+args.save_train = bool(args.save_train)
 tf.reset_default_graph()
 
 num_classes = 10
@@ -64,12 +72,9 @@ correct = tf.nn.in_top_k(logits, tf.argmax(label_layer, axis=1), 1)
 accuracy = tf.reduce_mean(tf.cast(correct, tf.float32))
 
 (x_train, y_train), (x_test, y_test) = cifar10.load_data()
-print(np.max(x_train))
-print(x_train.shape, y_train.shape, x_test.shape, y_test.shape)
 
 y_train = tf.keras.utils.to_categorical(y_train, 10)
 y_test = tf.keras.utils.to_categorical(y_test, 10)
-print(y_train.shape, y_test.shape)
 
 x_train = x_train.astype('float32')
 x_test = x_test.astype('float32')
@@ -77,49 +82,43 @@ x_test = x_test.astype('float32')
 x_train = x_train / np.float32(255.0)
 x_test = x_test / np.float32(255.0)
 
-print(x_train.dtype, x_test.dtype)
+if args.save_train:
+    x_init = x_test[args.index:args.index+1]
+    y_init = y_test[args.index:args.index+1]
 
-index = 100
+    file_name_x = 'cifar_{}.pb'.format(args.index) 
+    file_name_y = 'cifar_{}_label.pb'.format(args.index) 
 
-x_init = x_test[index:index+1]
-y_init = y_test[index:index+1]
+    x_proto = tf.make_tensor_proto(
+            x_init, dtype=x_init.dtype, shape=x_init.shape)
 
-file_name_x = 'cifar_{}.pb'.format(index) 
-file_name_y = 'cifar_{}_label.pb'.format(index) 
+    y_proto = tf.make_tensor_proto(
+            y_init, dtype=y_init.dtype, shape=y_init.shape)
 
-x_proto = tf.make_tensor_proto(
-        x_init, dtype=x_init.dtype, shape=x_init.shape)
+    with open(file_name_x, 'wb') as f:
+        f.write(x_proto.SerializeToString())
 
-y_proto = tf.make_tensor_proto(
-        y_init, dtype=y_init.dtype, shape=y_init.shape)
-
-with open(file_name_x, 'wb') as f:
-    f.write(x_proto.SerializeToString())
-
-with open(file_name_y, 'wb') as f:
-    f.write(y_proto.SerializeToString())
-
-epochs = 20
-batch_size = 200
+    with open(file_name_y, 'wb') as f:
+        f.write(y_proto.SerializeToString())
 
 init = tf.global_variables_initializer()
 with tf.Session() as sess:
     init.run()
-    for epoch in range(epochs):
+    for epoch in range(args.epochs):
         print('Epoch: {}'.format(epoch))
-        for i in range(x_train.shape[0] // batch_size):
+        for i in range(x_train.shape[0] // args.batch_size):
             batch_indices = np.random.randint(
-                    x_train.shape[0], size=batch_size)
+                    x_train.shape[0], size=args.batch_size)
             x_batch = x_train[batch_indices]
             y_batch = y_train[batch_indices]
             sess.run(train_op, feed_dict={
                 input_layer: x_batch, label_layer: y_batch})
         acc_test = accuracy.eval(feed_dict={
             input_layer: x_test, label_layer: y_test})
-        acc_train = accuracy.eval(feed_dict={
-            input_layer: x_train, label_layer: y_train})
-        print(epoch, "Test accuracy:", acc_test)
-        print(epoch, "Train accuracy:", acc_train)
+        #acc_train = accuracy.eval(feed_dict={
+            #input_layer: x_train, label_layer: y_train})
+        print("Test accuracy:", acc_test)
+        #print("Train accuracy:", acc_train)
 
     constant_graph = graph_util.convert_variables_to_constants(
             sess, 
