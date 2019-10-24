@@ -20,10 +20,7 @@ std::set<grid::point, grid::region_less_compare>
 
 void interrupt_handler(int p)
 {
-    for(auto&& adv_example : foundAdversarialExamples)
-    {
-        std::cout << "Found adv example\n";
-    }
+    std::cout << "Found " << foundAvdversarialExamples.size() << " adversarial examples\n";
     exit(1);
 }
 
@@ -121,8 +118,8 @@ int main(int argc, char* argv[])
     // tmp stuff
     // --------------
     std::cout << "########## Inital Point ##########\n";
-    std::cout << init_act_point.size() << "\n";
-    std::cout << numberOfInputDimensions << "\n";
+    std::cout << "Number of dimensions in input: " << init_act_point.size() << "\n";
+    std::cout << "Channels: " << numberOfInputDimensions << "\n";
     // --------------
 
     // first dimension is the batch size
@@ -136,18 +133,6 @@ int main(int argc, char* argv[])
         batch_input_shape[i] = init_act_tensor.dim_size(i);
         flattenedNumDims *= batch_input_shape[i];
     }
-
-    /*
-    auto back_check = graph_tool::pointToTensor(init_act_point,
-            batch_input_shape);
-
-    auto btmp = back_check.flat<float>();
-    auto tmp = init_act_tensor.flat<float>();
-    for(auto i = 0u; i < tmp.size(); ++i)
-    {
-        std::cout << btmp(i) << " " << tmp(i) << "\n";
-    }
-    */
 
     auto retFeedDict = [&]()
         ->std::vector<std::pair<std::string, tensorflow::Tensor>>
@@ -186,18 +171,16 @@ int main(int argc, char* argv[])
 
         if(tmp_class != orig_class)
             std::cout << tmp_class << " " << orig_class << "\n";
-        else
-            std::cout << "good\n";
     }
 
-    std::cout << "granularity: " << granularityVal << "\n";
-    std::cout << "original class: " << orig_class << "\n";
-    std::cout << "input shape: ";
+    std::cout << "Granularity: " << granularityVal << "\n";
+    std::cout << "Original class: " << orig_class << "\n";
+    std::cout << "Input shape: ";
     for(auto&& elem : batch_input_shape)
         std::cout << elem << " ";
     std::cout << "\n";
-    std::cout << "number_of_dimensions: " << numDimensionsToVerify << "\n";
-    std::cout << "verification_radius: " << radius << "\n\n";
+    std::cout << "Number of dimensions: " << numDimensionsToVerify << "\n";
+    std::cout << "Verification radius: " << radius << "\n\n";
 
     /* difference between discrete values of each dimension */
     grid::point granularity_parsed;
