@@ -190,16 +190,19 @@ namespace grid
     struct ModifiedFGSMRegionAbstraction
     {
         ModifiedFGSMRegionAbstraction(
-                std::size_t /* number of points to generate */, 
                 std::function<point(point const&)> const& /* gradient */,
                 dimension_selection_strategy_t const&,
-                double /* percent of dimensions for normal FGSM */);
+                double /* percent of dimensions for normal FGSM */,
+                double /* epsilon 1 */,
+                double /* epsilon 2 */);
         abstraction_strategy_return_t operator()(region const&);
     private:
         std::size_t maxPoints;
         std::function<point(point const&)> gradient;
         dimension_selection_strategy_t dim_select_strategy;
         double percentFGSM;
+        double epsilon1;
+        double epsilon2;
     };
 
     struct HierarchicalDimensionRefinementStrategy

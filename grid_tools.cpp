@@ -354,13 +354,16 @@ grid::point grid::sign(grid::point const& p)
 }
 
 grid::ModifiedFGSMRegionAbstraction::ModifiedFGSMRegionAbstraction(
-        std::size_t mp, 
         std::function<grid::point(grid::point const&)> const& grad,
         grid::dimension_selection_strategy_t const& dim_sel,
-        double pFGSM)
-    : maxPoints(mp), gradient(grad), 
+        double pFGSM,
+        double e1,
+        double e2 = 1.001)
+    : gradient(grad), 
       dim_select_strategy(dim_sel),
-      percentFGSM(std::abs(pFGSM) > 1 ? 1 : std::abs(pFGSM))
+      percentFGSM(std::abs(pFGSM) > 1 ? 1 : std::abs(pFGSM)),
+      epsilon1(e1),
+      epsilon2(e2)
 {
 }
 
@@ -387,52 +390,25 @@ grid::ModifiedFGSMRegionAbstraction::operator()(grid::region const& r)
                 [](grid::region_element const& a,
                     grid::region_element const& b)
                 { return a.second - a.first < b.second - b.first; });
-    auto max_radius = 
-        (min_dimension->second - min_dimension->first) / (long double)2.0;
-    /*
-     * research methods of relating e1 and e2 to granularity
-     * to increase probability of generated adversarial example
-     */
-    auto e1_lowerbound = (long double)0.00005;
-    auto e1_upperbound = (long double)max_radius;
-    auto e2_lowerbound = (long double)0.0;
-    auto e2_upperbound = (long double)max_radius / e1_lowerbound - 1.0;
 
     std::default_random_engine rand_gen;
-    auto dist_e1 = 
-        std::uniform_real_distribution<long double>(
-                e1_lowerbound, e1_upperbound);
-    auto dist_e2 = 
-        std::uniform_real_distribution<long double>(
-                e2_lowerbound, e2_upperbound);
     auto dist_R = std::uniform_int_distribution<int>(0,1);
 
-    grid::abstraction_strategy_return_t retVal;
-    retVal.reserve(maxPoints);
-    for(auto i = 0u; i < maxPoints; ++i)
+    grid::point R(r.size());
+    for(auto&& elem : R)
     {
-        auto e1 = dist_e1(rand_gen); 
-        auto e2 = dist_e2(rand_gen);
-        grid::point R(r.size());
-        for(auto&& elem : R)
-        {
-            elem = dist_R(rand_gen);
-            if(elem != 1) elem = -1;
-        }
-        auto fgsm_part = elementWiseMult(grad_sign, M);
-        auto mod_part = constVecMult(e2, elementWiseMult(R, Mnot));
-        auto scaled_part = constVecMult(e1, fgsm_part + mod_part);
-        auto generated_point = p + scaled_part;
-        /*
-        if(!grid::isInDomainRange(generated_point, r))
-        {
-            std::cout << "out of range\n";
-            continue;
-        }
-        */
-        retVal.push_back(generated_point);
+        elem = dist_R(rand_gen);
+        if(elem != 1) elem = -1;
     }
-    return retVal;
+    auto fgsm_part = elementWiseMult(grad_sign, M);
+    auto mod_part = constVecMult(epsilon2, elementWiseMult(R, Mnot));
+    auto scaled_part = constVecMult(epsilon1, fgsm_part + mod_part);
+    auto generated_point = p + scaled_part;
+    if(!grid::isInDomainRange(generated_point, r))
+    {
+        std::cout << "out of range\n";
+    }
+    return { generated_point };
 }
 
 grid::HierarchicalDimensionRefinementStrategy::HierarchicalDimensionRefinementStrategy(

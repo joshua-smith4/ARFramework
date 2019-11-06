@@ -244,7 +244,6 @@ int main(int argc, char* argv[])
         auto label_tensor = label_tensor_pair.second;
         abstraction_strategy = 
             grid::ModifiedFGSMRegionAbstraction(
-                1u,
                 [&,label_tensor_copy = label_tensor]
                 (grid::point const& p) -> grid::point
                 {
@@ -262,7 +261,9 @@ int main(int argc, char* argv[])
                             {gradient_layer});
                 },
                 intellifeature_selection_strategy,
-                fgsm_balance_factor);
+                fgsm_balance_factor,
+                granularityVal,
+                1.001);
     }
 
     grid::region_refinement_strategy_t refinement_strategy = 
@@ -311,7 +312,7 @@ int main(int argc, char* argv[])
                 all_valid_discretization_strategy,
                 isPointSafe);
 
-    std::vector<grid::region> potentiallyUnsafeRegions;
+    std::deque<grid::region> potentiallyUnsafeRegions;
     std::vector<grid::region> safeRegions;
     unsigned long long numberSafeValidPoints = 0ull;
     std::vector<std::pair<grid::region, grid::point>> 
@@ -384,8 +385,8 @@ int main(int argc, char* argv[])
         print_count++;
         if(!potentiallyUnsafeRegions.empty())
         {
-            auto selected_region = potentiallyUnsafeRegions.back();
-            potentiallyUnsafeRegions.pop_back();
+            auto selected_region = potentiallyUnsafeRegions.front();
+            potentiallyUnsafeRegions.pop_front();
 
             selected_region = grid::snapToDomainRange(
                     selected_region,
