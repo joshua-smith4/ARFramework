@@ -49,7 +49,7 @@ void ARFramework::worker_routine()
                  !unsafeRegionsWithAdvExamples.empty()) 
                 && keep_working)
         {
-            if(std::this_thread::get_id() == logging_thread_id && counter >= 100)
+            if(counter >= 100 && std::this_thread::get_id() == logging_thread_id)
             {
                 std::cout << "Potentially Unsafe Regions: " << potentiallyUnsafeRegions.size()
                     << "\n";
