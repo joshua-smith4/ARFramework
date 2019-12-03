@@ -13,15 +13,14 @@
 
 #include "tensorflow_graph_tools.hpp"
 #include "GraphManager.hpp"
+#include "ARFramework.hpp"
 #include "grid_tools.hpp"
 
-std::set<grid::point, grid::region_less_compare> 
-    foundAdversarialExamples;
-
-void interrupt_handler(int p)
+std::function<void(void)> shutdown_callback;
+void shutdown_handler(int p)
 {
-    std::cout << "Found " << foundAdversarialExamples.size() << " adversarial examples\n";
-    exit(1);
+    shutdown_callback();
+    std::cout << "shutting down... please wait\n";
 }
 
 
@@ -40,6 +39,7 @@ int main(int argc, char* argv[])
     std::string label_proto = "label_proto";
     std::string label_layer = "label_layer_placeholder";
     std::string fgsm_balance_factor_opt = "0.95";
+    std::string num_threads_str = "4";
 
     std::vector<tensorflow::Flag> flag_list = {
         tensorflow::Flag("graph", &graph, "path to protobuf graph to be executed"),
@@ -54,7 +54,8 @@ int main(int argc, char* argv[])
         tensorflow::Flag("class_averages", &class_averages, "the class averages of the training data (optional - used for FGSM)"),
         tensorflow::Flag("label_proto", &label_proto, "protocol buffer of label image corresponding with initial activation"),
         tensorflow::Flag("label_layer", &label_layer, "name of label layer"),
-        tensorflow::Flag("fgsm_balance_factor", &fgsm_balance_factor_opt, "Balance factor for modified FGSM algorithm (ratio dimensions fgsm/random)")
+        tensorflow::Flag("fgsm_balance_factor", &fgsm_balance_factor_opt, "Balance factor for modified FGSM algorithm (ratio dimensions fgsm/random)"),
+        tensorflow::Flag("num_threads", &num_threads_str, "number of threads to use"),
     };
 
     std::string usage = tensorflow::Flags::Usage(argv[0], flag_list);
@@ -83,6 +84,7 @@ int main(int argc, char* argv[])
         return -1;
     }
     auto radius = radiusProvided ? std::atof(verification_radius.c_str()) : 0.5;
+    auto num_threads = std::atoi(num_threads_str.c_str());
     auto fgsm_balance_factor = std::atof(fgsm_balance_factor_opt.c_str());
 
     std::string graph_path = tensorflow::io::JoinPath(root_dir, graph);
@@ -311,12 +313,6 @@ int main(int argc, char* argv[])
                 all_valid_discretization_strategy,
                 isPointSafe);
 
-    std::vector<grid::region> potentiallyUnsafeRegions;
-    std::vector<grid::region> safeRegions;
-    unsigned long long numberSafeValidPoints = 0ull;
-    std::vector<std::pair<grid::region, grid::point>> 
-        unsafeRegionsWithAdvExamples;
-
     // create the initial region from the initial activation
     // and the user provided radius
     grid::region orig_region(init_act_point.size());
@@ -327,6 +323,7 @@ int main(int argc, char* argv[])
         orig_region[i].second = 
             init_act_point[i] + radius;
     }
+    /*
     auto selected_dimensions = 
         intellifeature_selection_strategy(
                 orig_region, 
@@ -340,6 +337,7 @@ int main(int argc, char* argv[])
             init_act_point[selected_dimensions[i]];
     }
     std::cout << "\n";
+    */
 
     grid::region domain_range(orig_region.size());
     for(auto i = 0u; i < domain_range.size(); ++i)
@@ -349,191 +347,29 @@ int main(int argc, char* argv[])
     }
 
     orig_region = grid::snapToDomainRange(orig_region, domain_range);
-    if(!grid::isValidRegion(orig_region))
+
+    ARFramework arframework(
+            gm,
+            domain_range,
+            init_act_point,
+            granularity_parsed,
+            orig_region,
+            isPointSafe,
+            verification_engine,
+            abstraction_strategy,
+            refinement_strategy
+            );
+    shutdown_callback = [&](){ arframework.join(); };
+    auto handle = signal(SIGINT, shutdown_handler);
+    std::vector<std::thread> thread_pool;
+
+    for(auto i = 0u; i < num_threads; ++i)
     {
-        LOG(ERROR) << "the generated verification region is invalid";
-        exit(1);
-    }
-    std::cout << "Total number of valid points in verification region: "
-        << grid::AllValidDiscretizedPointsAbstraction
-            ::getNumberValidPoints(orig_region, init_act_point, granularity_parsed)
-        << "\n";
-
-    potentiallyUnsafeRegions.push_back(orig_region);
-
-    auto handle = signal(SIGINT, interrupt_handler);
-    const auto PRINT_PERIOD = 100ull;
-    auto print_count = PRINT_PERIOD;
-    while(!potentiallyUnsafeRegions.empty() || 
-            !unsafeRegionsWithAdvExamples.empty())
-    {
-        if(print_count >= PRINT_PERIOD)
-        {
-            std::cout << "Number of found adversarial examples: " 
-                << foundAdversarialExamples.size() << "\n";
-            std::cout << "Number of potentially unsafe regions: " 
-                << potentiallyUnsafeRegions.size() << "\n";
-            std::cout << "Number of unsafe regions: " 
-                << unsafeRegionsWithAdvExamples.size() << "\n";
-            std::cout << "Number of safe points: " 
-                << numberSafeValidPoints << "\n";
-            std::cout << "Number of safe regions: " 
-                << safeRegions.size() << "\n";
-            print_count = 0ull;
-        }
-        print_count++;
-        if(!potentiallyUnsafeRegions.empty())
-        {
-            auto selected_region = potentiallyUnsafeRegions.back();
-            potentiallyUnsafeRegions.pop_back();
-
-            selected_region = grid::snapToDomainRange(
-                    selected_region,
-                    domain_range);
-
-            auto numValidPoints = grid
-                ::AllValidDiscretizedPointsAbstraction
-                ::getNumberValidPoints(
-                        selected_region,
-                        init_act_point,
-                        granularity_parsed);
-            if(numValidPoints <= 0) continue;
-            auto verification_result = 
-                verification_engine(selected_region);
-            if(verification_result.first == 
-                    grid::VERIFICATION_RETURN::SAFE)
-            {
-                safeRegions.push_back(selected_region);
-                numberSafeValidPoints += numValidPoints;
-            }
-            else if(verification_result.first == 
-                    grid::VERIFICATION_RETURN::UNSAFE)
-            {
-                foundAdversarialExamples.insert(
-                        verification_result.second);    
-                auto subregions = refinement_strategy(selected_region);
-                auto subregion_with_adv_exp = 
-                    subregions.find(verification_result.second);
-                if(subregions.end() == subregion_with_adv_exp)
-                {
-                    LOG(ERROR) << "Adversarial example was found that did not belong to any subregions";
-                }
-                else
-                {
-                    unsafeRegionsWithAdvExamples.push_back({*subregion_with_adv_exp, verification_result.second});
-                    subregions.erase(subregion_with_adv_exp);
-                }
-                std::copy(subregions.begin(), subregions.end(),
-                        std::back_inserter(potentiallyUnsafeRegions));
-            }
-            else if(verification_result.first == 
-                    grid::VERIFICATION_RETURN::UNKNOWN)
-            {
-                auto subregions = refinement_strategy(selected_region);
-                std::map<grid::region, grid::point> unsafeRegionsTmp;
-                std::vector<grid::point> all_abstracted_points;
-                for(auto&& subregion : subregions)
-                {
-                    auto abstracted_points = 
-                        abstraction_strategy(subregion);
-                    for(auto&& pt : abstracted_points)
-                    {
-                        auto snapped_pt = grid::snapToDomainRange(
-                                grid::enforceSnapDiscreteGrid(
-                                    pt,
-                                    init_act_point,
-                                    granularity_parsed),
-                                domain_range);
-                        if(grid::isInDomainRange(snapped_pt, domain_range))
-                        {
-                            all_abstracted_points.push_back(snapped_pt);
-                        }
-                        else
-                        {
-                            LOG(ERROR) 
-                                << "Point was outside domain range\n";
-                        }
-                    }
-                }
-                for(auto&& pt : all_abstracted_points)
-                {
-                    if(isPointSafe(pt)) continue;
-                    auto found_subregion = subregions.find(pt);
-                    if(found_subregion == subregions.end())
-                    {
-                        continue;
-                    }
-                    unsafeRegionsTmp.insert({*found_subregion, pt});
-                    subregions.erase(found_subregion);
-                }
-                std::copy(unsafeRegionsTmp.begin(),
-                        unsafeRegionsTmp.end(),
-                        std::back_inserter(unsafeRegionsWithAdvExamples));
-                std::copy(subregions.begin(), 
-                        subregions.end(),
-                        std::back_inserter(potentiallyUnsafeRegions));
-            }
-        }
-        else
-        {
-            auto selected_region_adv_exp_pair = 
-                unsafeRegionsWithAdvExamples.back();
-            unsafeRegionsWithAdvExamples.pop_back();
-
-            if(grid::AllValidDiscretizedPointsAbstraction
-                    ::getNumberValidPoints(
-                        selected_region_adv_exp_pair.first, 
-                        init_act_point, 
-                        granularity_parsed) 
-                    <= 1ull)
-            {
-                //std::cout << "region has one or fewer valid points\n";
-                continue;
-            }
-            auto subregions = refinement_strategy(
-                    selected_region_adv_exp_pair.first);
-            std::set<grid::region, grid::region_less_compare> 
-                nonempty_subregions;
-            for(auto&& subregion : subregions)
-            {
-                if(grid::AllValidDiscretizedPointsAbstraction
-                        ::getNumberValidPoints(
-                            subregion,
-                            init_act_point,
-                            granularity_parsed) != 0ull)
-                    nonempty_subregions.insert(subregion);
-            }
-
-            if(nonempty_subregions.empty()) continue;
-            auto unsafeRegionItr = nonempty_subregions.find(
-                    selected_region_adv_exp_pair.second);
-            if(unsafeRegionItr != nonempty_subregions.end())
-            {
-                unsafeRegionsWithAdvExamples.push_back(
-                        {*unsafeRegionItr, 
-                        selected_region_adv_exp_pair.second});
-                nonempty_subregions.erase(unsafeRegionItr);
-            }
-            else
-            {
-                LOG(ERROR) << "Adversarial example was found not belonging to region after refined";
-            }
-
-            std::copy(subregions.begin(), subregions.end(),
-                    std::back_inserter(potentiallyUnsafeRegions));
-        }
+        thread_pool.emplace_back([&](){ arframework.run(); });
     }
 
-    std::cout << "Number of found adversarial examples: " 
-        << foundAdversarialExamples.size() << "\n";
-    std::cout << "Number of potentially unsafe regions: " 
-        << potentiallyUnsafeRegions.size() << "\n";
-    std::cout << "Number of unsafe regions: " 
-        << unsafeRegionsWithAdvExamples.size() << "\n";
-    std::cout << "Number of safe points: " 
-        << numberSafeValidPoints << "\n";
-    std::cout << "Number of safe regions: " 
-        << safeRegions.size() << "\n";
+    for(auto&& t : thread_pool)
+        t.join();
 
     std::cout << "exiting\n";
     return 0;

@@ -18,11 +18,13 @@ tf_cc_binary(
     srcs = [
         "main.cpp",
         "GraphManager.cpp",
+        "ARFramework.cpp",
         "grid_tools.cpp",
         "tensorflow_graph_tools.cpp",
     ],
     includes = [
         "GraphManager.hpp",
+        "ARFramework.hpp",
         "grid_tools.hpp",
         "tensorflow_graph_tools.hpp",
     ],
