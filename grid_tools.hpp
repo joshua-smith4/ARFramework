@@ -109,6 +109,7 @@ namespace grid
         explicit RandomPointRegionAbstraction(unsigned);
         abstraction_strategy_return_t operator()(region const&);
         unsigned numPoints;
+        std::minstd_rand0 generator;
     };
 
     // abstracts a region to the central point
@@ -162,6 +163,8 @@ namespace grid
     // random dimension selection algorithm
     dim_selection_strategy_return_t randomDimSelection(region const&, 
             std::size_t);
+    dim_selection_strategy_return_t largestDimFirst(region const&, 
+            std::size_t);
 
     // dimension selection algorithm outlined in
     // the DLV paper (Xiaowei et. al.)
@@ -200,6 +203,7 @@ namespace grid
         std::function<point(point const&)> gradient;
         dimension_selection_strategy_t dim_select_strategy;
         double percentFGSM;
+        std::minstd_rand0 rand_gen;
     };
 
     struct HierarchicalDimensionRefinementStrategy

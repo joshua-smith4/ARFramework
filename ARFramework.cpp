@@ -37,12 +37,11 @@ ARFramework::ARFramework(
         LOG(ERROR) << "Invalid original region";
         exit(1);
     }
-    potentiallyUnsafeRegions.insert(orig_region);
+    potentiallyUnsafeRegions.push_back(orig_region);
 }
 
 void ARFramework::log_status()
 {
-    //if(std::this_thread::get_id() != logging_thread_id) return;
     std::cout << "Potentially Unsafe Regions: " 
         << potentiallyUnsafeRegions.size() << "\n";
     std::cout << "Unsafe Regions: " 
@@ -61,7 +60,7 @@ void ARFramework::worker_routine()
                  !unsafeRegionsWithAdvExamples.empty()) 
                 && keep_working)
         {
-            if(counter >= 200)
+            if(counter >= 100 && std::this_thread::get_id() == logging_thread_id)
             {
                 log_status();
                 counter = 0u;
@@ -75,10 +74,22 @@ void ARFramework::worker_routine()
                     std::lock_guard<std::mutex> lock(pur_mutex);
                     if(!potentiallyUnsafeRegions.empty())
                     {
+                        // stack
+                        selected_region = potentiallyUnsafeRegions.back();
+                        potentiallyUnsafeRegions.pop_back();
+
+                        // queue
+                        /*
+                        selected_region = potentiallyUnsafeRegions.front();
+                        potentiallyUnsafeRegions.pop_front();
+                        */
+
+                        /* set
                         selected_region = 
                             *potentiallyUnsafeRegions.begin();
                         potentiallyUnsafeRegions.erase(
-                                potentiallyUnsafeRegions.begin());
+                            potentiallyUnsafeRegions.begin());
+                        */
                         got_valid_region = true;
                     }
                 }
@@ -110,7 +121,8 @@ void ARFramework::worker_routine()
                         subregions.find(verification_result.second);
                     if(subregions.end() == subregion_with_adv_exp)
                     {
-                        LOG(ERROR) << "Adversarial example was found that did not belong to any subregions";
+                        LOG(ERROR) 
+                            << "Adversarial example was found that did not belong to any subregions";
                     }
                     else
                     {
@@ -126,9 +138,14 @@ void ARFramework::worker_routine()
                     {
                         std::lock_guard<std::mutex> lock(pur_mutex);
                         std::copy(subregions.begin(), subregions.end(),
+                                std::back_inserter(potentiallyUnsafeRegions)
+                                );
+                        /*
+                        std::copy(subregions.begin(), subregions.end(),
                                 std::inserter(potentiallyUnsafeRegions,
                                     potentiallyUnsafeRegions.begin())
                                 );
+                        */
                     }
                 }
                 else if(verification_result.first ==
@@ -143,12 +160,16 @@ void ARFramework::worker_routine()
                             abstraction_strategy(subregion);
                         for(auto&& pt : abstracted_points)
                         {
+                            auto discrete_pt = grid::enforceSnapDiscreteGrid(
+                                    pt, init_point, granularity);
                             auto snapped_pt = grid::snapToDomainRange(
-                                    grid::enforceSnapDiscreteGrid(
-                                        pt,
-                                        init_point,
-                                        granularity),
+                                    discrete_pt,
                                     domain_range);
+                            /*
+                            auto snapped_pt = grid::snapToDomainRange(
+                                    pt,
+                                    domain_range);
+                            */
                             if(grid::isInDomainRange(snapped_pt, domain_range))
                             {
                                 all_abstracted_points.push_back(
@@ -171,6 +192,7 @@ void ARFramework::worker_routine()
                                     {*found_subregion, pt});
                             subregions.erase(found_subregion);
                         }
+                        /*
                         else
                         {
                             std::lock_guard<std::mutex> lock(pur_mutex);
@@ -185,6 +207,7 @@ void ARFramework::worker_routine()
                                         found_region);
                             }
                         }
+                        */
                     }
                     {
                         std::lock_guard<std::mutex> lock(ur_mutex);
@@ -199,8 +222,14 @@ void ARFramework::worker_routine()
                         std::lock_guard<std::mutex> lock(pur_mutex);
                         std::copy(subregions.begin(),
                                 subregions.end(),
+                                std::back_inserter(potentiallyUnsafeRegions)
+                                );
+                        /*
+                        std::copy(subregions.begin(),
+                                subregions.end(),
                                 std::inserter(potentiallyUnsafeRegions,
                                     potentiallyUnsafeRegions.begin()));
+                        */
                     }
                 }
             }
@@ -262,8 +291,14 @@ void ARFramework::worker_routine()
                     std::lock_guard<std::mutex> lock(pur_mutex);
                     std::copy(nonempty_subregions.begin(), 
                             nonempty_subregions.end(), 
+                            std::back_inserter(potentiallyUnsafeRegions)
+                            );
+                    /*
+                    std::copy(nonempty_subregions.begin(), 
+                            nonempty_subregions.end(), 
                             std::inserter(potentiallyUnsafeRegions, 
                                 potentiallyUnsafeRegions.begin()));
+                    */
                 }
             }
         }

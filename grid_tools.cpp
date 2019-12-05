@@ -117,7 +117,7 @@ grid::VolumeThresholdFilterStrategy::operator()(grid::region const& r)
 
 grid::RandomPointRegionAbstraction::RandomPointRegionAbstraction(
         unsigned n)
-    : numPoints(n)
+    : numPoints(n), generator(1029)
 {
 }
 
@@ -125,7 +125,7 @@ grid::abstraction_strategy_return_t
 grid::RandomPointRegionAbstraction::operator()(region const& r)
 {
     grid::abstraction_strategy_return_t retVal;
-    std::default_random_engine generator;
+    //std::default_random_engine generator;
     for(auto i = 0u; i < numPoints; ++i)
     {
         grid::point tmp(r.size());
@@ -274,11 +274,23 @@ grid::DiscreteSearchVerificationEngine::operator()(
 grid::dim_selection_strategy_return_t
 grid::randomDimSelection(region const& r, std::size_t numDims)
 {
+    static std::minstd_rand0 rd(133);
+    static std::mt19937 g(rd());
     grid::dim_selection_strategy_return_t indices(r.size());
     std::iota(indices.begin(), indices.end(), 0);
-    std::random_device rd;
-    std::mt19937 g(rd());
     std::shuffle(indices.begin(), indices.end(), g);
+    return {indices.begin(), indices.begin() + numDims};
+}
+
+grid::dim_selection_strategy_return_t
+grid::largestDimFirst(region const& r, std::size_t numDims)
+{
+    grid::dim_selection_strategy_return_t indices(r.size());
+    std::iota(indices.begin(), indices.end(), 0u);
+    std::sort(indices.begin(), indices.end(), [&](std::size_t a, std::size_t b)
+            {
+                return r[a].second - r[a].first > r[b].second - r[b].first;
+            });
     return {indices.begin(), indices.begin() + numDims};
 }
 
@@ -360,7 +372,8 @@ grid::ModifiedFGSMRegionAbstraction::ModifiedFGSMRegionAbstraction(
         double pFGSM)
     : maxPoints(mp), gradient(grad), 
       dim_select_strategy(dim_sel),
-      percentFGSM(std::abs(pFGSM) > 1 ? 1 : std::abs(pFGSM))
+      percentFGSM(std::abs(pFGSM) > 1 ? 1 : std::abs(pFGSM)),
+      rand_gen(42)
 {
 }
 
@@ -395,7 +408,7 @@ grid::ModifiedFGSMRegionAbstraction::operator()(grid::region const& r)
     auto e2_lowerbound = (long double)0.0;
     auto e2_upperbound = (long double)max_radius / e1_lowerbound - 1.0;
 
-    std::default_random_engine rand_gen;
+    //std::default_random_engine rand_gen;
     auto dist_e1 = 
         std::uniform_real_distribution<long double>(
                 e1_lowerbound, e1_upperbound);

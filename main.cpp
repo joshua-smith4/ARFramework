@@ -44,6 +44,7 @@ int main(int argc, char* argv[])
     std::string label_layer = "label_layer_placeholder";
     std::string fgsm_balance_factor_opt = "0.95";
     std::string num_threads_str = "4";
+    std::string num_abstractions_str = "1";
     std::string output_dir = "adv_examples";
 
     std::vector<tensorflow::Flag> flag_list = {
@@ -61,6 +62,7 @@ int main(int argc, char* argv[])
         tensorflow::Flag("label_layer", &label_layer, "name of label layer"),
         tensorflow::Flag("fgsm_balance_factor", &fgsm_balance_factor_opt, "Balance factor for modified FGSM algorithm (ratio dimensions fgsm/random)"),
         tensorflow::Flag("num_threads", &num_threads_str, "number of threads to use"),
+        tensorflow::Flag("num_abstractions", &num_abstractions_str, "number of points to use as abstractions"),
         tensorflow::Flag("output_dir", &output_dir, "location of adversarial example output")
     };
 
@@ -91,6 +93,7 @@ int main(int argc, char* argv[])
     }
     auto radius = radiusProvided ? std::atof(verification_radius.c_str()) : 0.5;
     auto num_threads = std::atoi(num_threads_str.c_str());
+    auto num_abstractions = std::atoi(num_abstractions_str.c_str());
     auto fgsm_balance_factor = std::atof(fgsm_balance_factor_opt.c_str());
 
     std::string graph_path = tensorflow::io::JoinPath(root_dir, graph);
@@ -127,6 +130,7 @@ int main(int argc, char* argv[])
     std::cout << "########## Inital Point ##########\n";
     std::cout << "Number of dimensions in input: " << init_act_point.size() << "\n";
     std::cout << "Number of threads: " << num_threads << "\n";
+    std::cout << "Number of points per abstractions: " << num_abstractions << "\n";
     std::cout << "Channels: " << numberOfInputDimensions << "\n";
     // --------------
 
@@ -202,18 +206,22 @@ int main(int argc, char* argv[])
             granularityVal);
 
     grid::dimension_selection_strategy_t dimension_selection_strategy = 
+        grid::largestDimFirst;
+    /*
+    grid::dimension_selection_strategy_t dimension_selection_strategy = 
         grid::randomDimSelection;
+    */
 
     grid::dimension_selection_strategy_t 
         intellifeature_selection_strategy = 
         grid::randomDimSelection;
 
+    grid::region_abstraction_strategy_t abstraction_strategy = 
+        grid::RandomPointRegionAbstraction(num_abstractions);
     /*
     grid::region_abstraction_strategy_t abstraction_strategy = 
-        grid::RandomPointRegionAbstraction(1u);
-    */
-    grid::region_abstraction_strategy_t abstraction_strategy = 
         grid::centralPointRegionAbstraction;
+    */
 
     auto hasAveragesProto = class_averages != "class_averages";
     auto hasLabelProto = label_proto != "label_proto";

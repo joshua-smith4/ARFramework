@@ -22,7 +22,7 @@ x_train /= 255
 
 y_train = tf.keras.utils.to_categorical(y_train, 10)
 
-index = 100
+index = 200
 x_init = x_train[index:index+1]
 y_init = y_train[index:index+1]
 
