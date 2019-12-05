@@ -35,9 +35,7 @@ pool2_flat = tf.reshape(pool2, [-1, 7 * 7 * 64], name="pool_2_flat")
 dense = tf.layers.dense(
         inputs=pool2_flat, units=1024, activation=tf.nn.relu, name='dense_1')
 
-dropout = tf.nn.dropout(dense, rate=0.4, name='dropout_1')
-
-logits = tf.layers.dense(inputs=dropout, units=10, name='logits')
+logits = tf.layers.dense(inputs=dense, units=10, name='logits')
 classes = tf.argmax(input=logits, axis=1, name='classes')
 probabilities = tf.nn.softmax(logits, name="probabilities_out")
 loss = tf.nn.softmax_cross_entropy_with_logits(labels=y, logits=logits, name='loss_func')

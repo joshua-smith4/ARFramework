@@ -1,4 +1,5 @@
 #include "ARFramework.hpp"
+#include <chrono>
 
 ARFramework::ARFramework(
         GraphManager& graph_manager,
@@ -39,28 +40,37 @@ ARFramework::ARFramework(
     potentiallyUnsafeRegions.insert(orig_region);
 }
 
+void ARFramework::log_status()
+{
+    //if(std::this_thread::get_id() != logging_thread_id) return;
+    std::cout << "Potentially Unsafe Regions: " 
+        << potentiallyUnsafeRegions.size() << "\n";
+    std::cout << "Unsafe Regions: " 
+        << unsafeRegionsWithAdvExamples.size() << "\n";
+    std::cout << "Safe Regions: " << safeRegions.size() << "\n";
+}
+
 void ARFramework::worker_routine()
 {
     auto counter = 0u;
     while(keep_working)
     {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
         while(
                 (!potentiallyUnsafeRegions.empty() || 
                  !unsafeRegionsWithAdvExamples.empty()) 
                 && keep_working)
         {
-            if(counter >= 100 && std::this_thread::get_id() == logging_thread_id)
+            if(counter >= 200)
             {
-                std::cout << "Potentially Unsafe Regions: " << potentiallyUnsafeRegions.size()
-                    << "\n";
-                std::cout << "Unsafe Regions: " << unsafeRegionsWithAdvExamples.size() << "\n";
-                std::cout << "Safe Regions: " << safeRegions.size() << "\n";
+                log_status();
                 counter = 0u;
             }
             ++counter;
             if(!potentiallyUnsafeRegions.empty())
             {
                 grid::region selected_region;
+                bool got_valid_region = false;
                 {
                     std::lock_guard<std::mutex> lock(pur_mutex);
                     if(!potentiallyUnsafeRegions.empty())
@@ -69,9 +79,10 @@ void ARFramework::worker_routine()
                             *potentiallyUnsafeRegions.begin();
                         potentiallyUnsafeRegions.erase(
                                 potentiallyUnsafeRegions.begin());
+                        got_valid_region = true;
                     }
                 }
-                if(selected_region.empty()) continue;
+                if(!got_valid_region) continue;
                 selected_region = grid::snapToDomainRange(
                         selected_region,
                         domain_range);
@@ -93,7 +104,8 @@ void ARFramework::worker_routine()
                 else if(verification_result.first ==
                         grid::VERIFICATION_RETURN::UNSAFE)
                 {
-                    auto subregions = refinement_strategy(selected_region);
+                    auto subregions = 
+                        refinement_strategy(selected_region);
                     auto subregion_with_adv_exp =
                         subregions.find(verification_result.second);
                     if(subregions.end() == subregion_with_adv_exp)
@@ -111,11 +123,13 @@ void ARFramework::worker_routine()
                         }
                         subregions.erase(subregion_with_adv_exp);
                     }
-                    std::lock_guard<std::mutex> lock(pur_mutex);
-                    std::copy(subregions.begin(), subregions.end(),
-                            std::inserter(potentiallyUnsafeRegions,
-                                potentiallyUnsafeRegions.begin())
-                            );
+                    {
+                        std::lock_guard<std::mutex> lock(pur_mutex);
+                        std::copy(subregions.begin(), subregions.end(),
+                                std::inserter(potentiallyUnsafeRegions,
+                                    potentiallyUnsafeRegions.begin())
+                                );
+                    }
                 }
                 else if(verification_result.first ==
                         grid::VERIFICATION_RETURN::UNKNOWN)
@@ -176,8 +190,10 @@ void ARFramework::worker_routine()
                         std::lock_guard<std::mutex> lock(ur_mutex);
                         std::copy(unsafeRegionsTmp.begin(),
                                 unsafeRegionsTmp.end(),
-                                std::inserter(unsafeRegionsWithAdvExamples,
-                                    unsafeRegionsWithAdvExamples.begin()));
+                                std::inserter(
+                                    unsafeRegionsWithAdvExamples,
+                                    unsafeRegionsWithAdvExamples.begin())
+                                );
                     }
                     {
                         std::lock_guard<std::mutex> lock(pur_mutex);
@@ -242,11 +258,13 @@ void ARFramework::worker_routine()
                 {
                     LOG(ERROR) << "Adv exp was found not belonging to region after refined";
                 }
-                std::lock_guard<std::mutex> lock(pur_mutex);
-                std::copy(nonempty_subregions.begin(), 
-                        nonempty_subregions.end(), 
-                        std::inserter(potentiallyUnsafeRegions, 
-                            potentiallyUnsafeRegions.begin()));
+                {
+                    std::lock_guard<std::mutex> lock(pur_mutex);
+                    std::copy(nonempty_subregions.begin(), 
+                            nonempty_subregions.end(), 
+                            std::inserter(potentiallyUnsafeRegions, 
+                                potentiallyUnsafeRegions.begin()));
+                }
             }
         }
     }

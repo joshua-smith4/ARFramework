@@ -389,10 +389,7 @@ grid::ModifiedFGSMRegionAbstraction::operator()(grid::region const& r)
                 { return a.second - a.first < b.second - b.first; });
     auto max_radius = 
         (min_dimension->second - min_dimension->first) / (long double)2.0;
-    /*
-     * research methods of relating e1 and e2 to granularity
-     * to increase probability of generated adversarial example
-     */
+
     auto e1_lowerbound = (long double)0.00005;
     auto e1_upperbound = (long double)max_radius;
     auto e2_lowerbound = (long double)0.0;

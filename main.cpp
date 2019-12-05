@@ -1,4 +1,7 @@
 #include <map>
+#include <ctime>
+#include <chrono>
+#include <sstream>
 #include <csignal>
 #include <iostream>
 #include <iomanip>
@@ -10,6 +13,7 @@
 #include "tensorflow/core/platform/init_main.h"
 #include "tensorflow/core/platform/logging.h"
 #include "tensorflow/core/util/command_line_flags.h"
+#include "tensorflow/core/framework/tensor_util.h"
 
 #include "tensorflow_graph_tools.hpp"
 #include "GraphManager.hpp"
@@ -40,6 +44,7 @@ int main(int argc, char* argv[])
     std::string label_layer = "label_layer_placeholder";
     std::string fgsm_balance_factor_opt = "0.95";
     std::string num_threads_str = "4";
+    std::string output_dir = "adv_examples";
 
     std::vector<tensorflow::Flag> flag_list = {
         tensorflow::Flag("graph", &graph, "path to protobuf graph to be executed"),
@@ -56,6 +61,7 @@ int main(int argc, char* argv[])
         tensorflow::Flag("label_layer", &label_layer, "name of label layer"),
         tensorflow::Flag("fgsm_balance_factor", &fgsm_balance_factor_opt, "Balance factor for modified FGSM algorithm (ratio dimensions fgsm/random)"),
         tensorflow::Flag("num_threads", &num_threads_str, "number of threads to use"),
+        tensorflow::Flag("output_dir", &output_dir, "location of adversarial example output")
     };
 
     std::string usage = tensorflow::Flags::Usage(argv[0], flag_list);
@@ -117,10 +123,10 @@ int main(int argc, char* argv[])
     auto numberOfInputDimensions = init_act_tensor.dims();
     auto flattenedNumDims = 1ull;
 
-    // tmp stuff
     // --------------
     std::cout << "########## Inital Point ##########\n";
     std::cout << "Number of dimensions in input: " << init_act_point.size() << "\n";
+    std::cout << "Number of threads: " << num_threads << "\n";
     std::cout << "Channels: " << numberOfInputDimensions << "\n";
     // --------------
 
@@ -182,7 +188,10 @@ int main(int argc, char* argv[])
         std::cout << elem << " ";
     std::cout << "\n";
     std::cout << "Number of dimensions: " << numDimensionsToVerify << "\n";
-    std::cout << "Verification radius: " << radius << "\n\n";
+    std::cout << "Verification radius: " << radius << "\n";
+    std::cout << "Root Directory: " << root_dir << "\n";
+    std::cout << "Output Directory: " << output_dir << "\n";
+    std::cout << "\n";
 
     /* difference between discrete values of each dimension */
     grid::point granularity_parsed;
@@ -258,10 +267,13 @@ int main(int argc, char* argv[])
                         return {{input_layer, p_tensor},
                             {label_layer, label_tensor_copy}};
                     };
-                    return gm.feedThroughModel(
+                    auto retVal = gm.feedThroughModel(
                             createGradientFeedDict,
                             graph_tool::parseGraphOutToVector,
                             {gradient_layer});
+                    if(!gm.ok())
+                        LOG(ERROR) << "Error with model";
+                    return retVal;
                 },
                 intellifeature_selection_strategy,
                 fgsm_balance_factor);
@@ -296,8 +308,14 @@ int main(int argc, char* argv[])
                             input_layer, p, batch_input_shape),
                         &graph_tool::parseGraphOutToVector,
                         {output_layer});
+                if(!gm.ok())
+                    LOG(ERROR) << "GM Error in isPointSafe";
                 auto class_out = 
                     graph_tool::getClassOfClassificationVector(logits_out);
+                if(class_out != orig_class)
+                {
+                    std::cout << "found unsafe point\n";
+                }
                 return class_out == orig_class;
             };
 
@@ -323,21 +341,6 @@ int main(int argc, char* argv[])
         orig_region[i].second = 
             init_act_point[i] + radius;
     }
-    /*
-    auto selected_dimensions = 
-        intellifeature_selection_strategy(
-                orig_region, 
-                init_act_point.size());
-
-    for(auto i = numDimensionsToVerify; i < selected_dimensions.size(); ++i)
-    {
-        orig_region[selected_dimensions[i]].first = 
-            init_act_point[selected_dimensions[i]];
-        orig_region[selected_dimensions[i]].second = 
-            init_act_point[selected_dimensions[i]];
-    }
-    std::cout << "\n";
-    */
 
     grid::region domain_range(orig_region.size());
     for(auto i = 0u; i < domain_range.size(); ++i)
@@ -371,7 +374,55 @@ int main(int argc, char* argv[])
     for(auto&& t : thread_pool)
         t.join();
 
-    std::cout << "exiting\n";
+    std::cout << "All threads joined\n";
+
+    auto now = std::chrono::system_clock::now();
+    auto now_c = std::chrono::system_clock::to_time_t(now);
+    auto now_tm = std::localtime(&now_c); 
+    const unsigned BUFFER_SIZE = 30u;
+    char buffer[BUFFER_SIZE];
+    strftime(buffer, BUFFER_SIZE, "%Y_%m_%d_%H_%M_%S", now_tm);
+    auto timestamp = std::string(buffer);
+    auto report_function = [&](grid::point const& adv_exp)
+    {
+        static unsigned index = 0;
+        std::vector<float> tmp(adv_exp.begin(), adv_exp.end());
+        std::vector<std::size_t> tmp_size(batch_input_shape.begin(),
+                batch_input_shape.end());
+        auto adv_exp_tensor_proto = tensorflow::tensor::CreateTensorProto(
+                tmp,
+                tmp_size);
+        auto classification = graph_tool::getClassOfClassificationVector(
+                gm.feedThroughModel(
+                    std::bind(graph_tool::makeFeedDict, 
+                        input_layer, adv_exp, batch_input_shape),
+                    &graph_tool::parseGraphOutToVector,
+                    {output_layer})
+                );
+        if(!gm.ok())
+            LOG(ERROR) << "GM: error in report function";
+        std::stringstream file_name;
+        file_name << timestamp 
+            << "_" << index << "_" << orig_class << "_" 
+            << classification << ".pb";
+        ++index;
+        auto file_path = tensorflow::io::JoinPath(output_dir, 
+                file_name.str());
+        auto write_status = 
+            WriteBinaryProto(
+                    tensorflow::Env::Default(), 
+                    file_path,
+                    adv_exp_tensor_proto);
+        if(!write_status.ok())
+        {
+            LOG(ERROR) << "Couldn't write file " << file_path;
+        }
+    };
+    std::cout << "reporting...\n";
+
+    arframework.report(report_function);
+
+    std::cout << "done\n";
     return 0;
 }
 

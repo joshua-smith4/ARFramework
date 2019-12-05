@@ -43,6 +43,7 @@ private:
     std::atomic_flag log_thread_set;
 
     void worker_routine();
+    void log_status();
 
 public:
     ARFramework(
@@ -75,6 +76,16 @@ public:
 
     void run();
     void join() { keep_working = false; }
+
+    template <class CallbackFunc>
+    inline void report(CallbackFunc&& cb)
+    {
+        log_status();
+        for(auto&& adv_exp_pair : unsafeRegionsWithAdvExamples)
+        {
+            cb(adv_exp_pair.second);
+        }
+    }
 };
 
 #endif
