@@ -365,25 +365,45 @@ grid::point grid::sign(grid::point const& p)
     return ret;
 }
 
-grid::ModifiedFGSMRegionAbstraction::ModifiedFGSMRegionAbstraction(
+grid::ModifiedFGSMWithFallbackRegionAbstraction::ModifiedFGSMWithFallbackRegionAbstraction(
         std::size_t mp, 
         std::function<grid::point(grid::point const&)> const& grad,
         grid::dimension_selection_strategy_t const& dim_sel,
+        grid::region_abstraction_strategy_t const& fallback_strategy,
+        grid::point const& granularity,
         double pFGSM)
     : maxPoints(mp), gradient(grad), 
       dim_select_strategy(dim_sel),
+      fallback_strategy(fallback_strategy),
+      granularity(granularity),
       percentFGSM(std::abs(pFGSM) > 1 ? 1 : std::abs(pFGSM)),
       rand_gen(42)
 {
 }
 
 grid::abstraction_strategy_return_t
-grid::ModifiedFGSMRegionAbstraction::operator()(grid::region const& r)
+grid::ModifiedFGSMWithFallbackRegionAbstraction::operator()(grid::region const& r)
 {
     auto centralPointSet = grid::centralPointRegionAbstraction(r);
     if(centralPointSet.empty()) return {};
     auto p = *centralPointSet.begin();
     auto grad_sign = grid::sign(gradient(p));
+    auto min_dimension = 
+        std::min_element(r.begin(), r.end(),
+                [](grid::region_element const& a,
+                    grid::region_element const& b)
+                { return a.second - a.first < b.second - b.first; });
+    auto min_dimension_index = std::distance(r.begin(), min_dimension);
+    auto max_radius = 
+        (min_dimension->second - min_dimension->first) / (long double)2.0;
+    if(r.end() == min_dimension || 
+            max_radius <= granularity[min_dimension_index])
+    {
+        //std::cout << "falling back\n";
+        return fallback_strategy(r);
+    }
+
+    //std::cout << "using fgsm\n";
     auto dims = dim_select_strategy(r, r.size());
     auto numDimsFGSM = 
         static_cast<unsigned>(
@@ -395,15 +415,8 @@ grid::ModifiedFGSMRegionAbstraction::operator()(grid::region const& r)
         M[dims[i]] = 1.0;
         Mnot[dims[i]] = 0.0;
     }
-    auto min_dimension = 
-        std::min_element(r.begin(), r.end(),
-                [](grid::region_element const& a,
-                    grid::region_element const& b)
-                { return a.second - a.first < b.second - b.first; });
-    auto max_radius = 
-        (min_dimension->second - min_dimension->first) / (long double)2.0;
 
-    auto e1_lowerbound = (long double)0.00005;
+    auto e1_lowerbound = (long double)granularity[min_dimension_index];
     auto e1_upperbound = (long double)max_radius;
     auto e2_lowerbound = (long double)0.0;
     auto e2_upperbound = (long double)max_radius / e1_lowerbound - 1.0;
@@ -433,13 +446,6 @@ grid::ModifiedFGSMRegionAbstraction::operator()(grid::region const& r)
         auto mod_part = constVecMult(e2, elementWiseMult(R, Mnot));
         auto scaled_part = constVecMult(e1, fgsm_part + mod_part);
         auto generated_point = p + scaled_part;
-        /*
-        if(!grid::isInDomainRange(generated_point, r))
-        {
-            std::cout << "out of range\n";
-            continue;
-        }
-        */
         retVal.push_back(generated_point);
     }
     return retVal;

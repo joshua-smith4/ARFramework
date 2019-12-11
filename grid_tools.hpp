@@ -190,18 +190,22 @@ namespace grid
 
     point sign(point const&);
 
-    struct ModifiedFGSMRegionAbstraction
+    struct ModifiedFGSMWithFallbackRegionAbstraction
     {
-        ModifiedFGSMRegionAbstraction(
+        ModifiedFGSMWithFallbackRegionAbstraction(
                 std::size_t /* number of points to generate */, 
                 std::function<point(point const&)> const& /* gradient */,
                 dimension_selection_strategy_t const&,
+                region_abstraction_strategy_t const&,
+                point const&,
                 double /* percent of dimensions for normal FGSM */);
         abstraction_strategy_return_t operator()(region const&);
     private:
         std::size_t maxPoints;
         std::function<point(point const&)> gradient;
         dimension_selection_strategy_t dim_select_strategy;
+        region_abstraction_strategy_t fallback_strategy;
+        const point granularity;
         double percentFGSM;
         std::minstd_rand0 rand_gen;
     };

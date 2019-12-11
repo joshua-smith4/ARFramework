@@ -75,14 +75,14 @@ void ARFramework::worker_routine()
                     if(!potentiallyUnsafeRegions.empty())
                     {
                         // stack
+                        /*
                         selected_region = potentiallyUnsafeRegions.back();
                         potentiallyUnsafeRegions.pop_back();
+                        */
 
                         // queue
-                        /*
                         selected_region = potentiallyUnsafeRegions.front();
                         potentiallyUnsafeRegions.pop_front();
-                        */
 
                         /* set
                         selected_region = 
@@ -153,7 +153,7 @@ void ARFramework::worker_routine()
                 {
                     auto subregions = refinement_strategy(selected_region);
                     std::map<grid::region, grid::point, grid::region_less_compare> unsafeRegionsTmp;
-                    std::vector<grid::point> all_abstracted_points;
+                    std::set<grid::point> all_abstracted_points;
                     for(auto&& subregion : subregions)
                     {
                         auto abstracted_points = 
@@ -172,7 +172,11 @@ void ARFramework::worker_routine()
                             */
                             if(grid::isInDomainRange(snapped_pt, domain_range))
                             {
+                                /*
                                 all_abstracted_points.push_back(
+                                        snapped_pt);
+                                */
+                                all_abstracted_points.insert(
                                         snapped_pt);
                             }
                             else
@@ -182,6 +186,11 @@ void ARFramework::worker_routine()
                             }
                         }
                     }
+                    /*
+                    std::cout << "abstracted " << subregions.size()
+                        << " regions into " << all_abstracted_points.size()
+                        << " points\n";
+                    */
                     for(auto&& pt : all_abstracted_points)
                     {
                         if(safety_predicate(pt)) continue;

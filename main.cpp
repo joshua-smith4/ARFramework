@@ -262,8 +262,8 @@ int main(int argc, char* argv[])
         }
         auto label_tensor = label_tensor_pair.second;
         abstraction_strategy = 
-            grid::ModifiedFGSMRegionAbstraction(
-                1u,
+            grid::ModifiedFGSMWithFallbackRegionAbstraction(
+                num_abstractions,
                 [&,label_tensor_copy = label_tensor]
                 (grid::point const& p) -> grid::point
                 {
@@ -284,6 +284,8 @@ int main(int argc, char* argv[])
                     return retVal;
                 },
                 intellifeature_selection_strategy,
+                grid::RandomPointRegionAbstraction(2u),
+                granularity_parsed,
                 fgsm_balance_factor);
     }
 
