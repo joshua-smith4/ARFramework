@@ -402,7 +402,6 @@ grid::ModifiedFGSMWithFallbackRegionAbstraction::operator()(grid::region const& 
     if(r.end() == min_dimension || 
             max_radius <= granularity[min_dimension_index])
     {
-        std::cout << "falling back\n";
         return fallback_strategy(r);
     }
 
