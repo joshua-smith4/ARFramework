@@ -293,7 +293,7 @@ int main(int argc, char* argv[])
         grid::HierarchicalDimensionRefinementStrategy(
                 dimension_selection_strategy,
                 2u,
-                5u);
+                2u);
 
     auto all_valid_discretization_strategy = 
         grid::AllValidDiscretizedPointsAbstraction(
@@ -322,10 +322,6 @@ int main(int argc, char* argv[])
                     LOG(ERROR) << "GM Error in isPointSafe";
                 auto class_out = 
                     graph_tool::getClassOfClassificationVector(logits_out);
-                if(class_out != orig_class)
-                {
-                    std::cout << "found unsafe point\n";
-                }
                 return class_out == orig_class;
             };
 
@@ -415,6 +411,7 @@ int main(int argc, char* argv[])
         file_name << timestamp 
             << "_" << index << "_" << orig_class << "_" 
             << classification << ".pb";
+        std::cout << "Class of adversarial example: " << classification << "\n";
         ++index;
         auto file_path = tensorflow::io::JoinPath(output_dir, 
                 file_name.str());

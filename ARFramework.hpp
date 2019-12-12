@@ -20,11 +20,11 @@
 class ARFramework
 {
 private:
-    std::deque<grid::region> potentiallyUnsafeRegions;
     /*
+    std::deque<grid::region> potentiallyUnsafeRegions;
+    */
     std::set<grid::region, grid::region_less_compare> 
         potentiallyUnsafeRegions;
-    */
     std::mutex pur_mutex;
     std::vector<grid::region> safeRegions;
     std::mutex sr_mutex;

@@ -386,22 +386,19 @@ grid::ModifiedFGSMWithFallbackRegionAbstraction::operator()(grid::region const& 
 {
     auto centralPointSet = grid::centralPointRegionAbstraction(r);
     if(centralPointSet.empty()) return {};
+
     auto p = *centralPointSet.begin();
     auto grad_sign = grid::sign(gradient(p));
-    /*
-    for(auto&& elem : grad_sign)
-        std::cout << elem << " ";
-    std::cout << "\n\n";
-    */
+
     auto min_dimension = 
         std::min_element(r.begin(), r.end(),
                 [](grid::region_element const& a,
                     grid::region_element const& b)
                 { return a.second - a.first < b.second - b.first; });
+
     auto min_dimension_index = std::distance(r.begin(), min_dimension);
     auto max_radius = 
         (min_dimension->second - min_dimension->first) / (long double)2.0;
-    std::cout << "max_radius: " << max_radius << "\n";
     if(r.end() == min_dimension || 
             max_radius <= granularity[min_dimension_index])
     {
@@ -423,7 +420,8 @@ grid::ModifiedFGSMWithFallbackRegionAbstraction::operator()(grid::region const& 
     }
 
     auto e1_lowerbound = 1;
-    auto e1_upperbound = static_cast<int>(max_radius / granularity[min_dimension_index]);
+    auto e1_upperbound = 
+        static_cast<int>(max_radius / granularity[min_dimension_index]);
     auto e2_lowerbound = (long double)0.0;
     auto e2_upperbound = 
         (long double)max_radius / granularity[min_dimension_index] - 1.0;

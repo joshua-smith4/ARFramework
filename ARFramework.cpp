@@ -37,7 +37,7 @@ ARFramework::ARFramework(
         LOG(ERROR) << "Invalid original region";
         exit(1);
     }
-    potentiallyUnsafeRegions.push_back(orig_region);
+    potentiallyUnsafeRegions.insert(orig_region);
 }
 
 void ARFramework::log_status()
@@ -81,15 +81,15 @@ void ARFramework::worker_routine()
                         */
 
                         // queue
+                        /*
                         selected_region = potentiallyUnsafeRegions.front();
                         potentiallyUnsafeRegions.pop_front();
+                        */
 
-                        /* set
                         selected_region = 
                             *potentiallyUnsafeRegions.begin();
                         potentiallyUnsafeRegions.erase(
                             potentiallyUnsafeRegions.begin());
-                        */
                         got_valid_region = true;
                     }
                 }
@@ -137,15 +137,15 @@ void ARFramework::worker_routine()
                     }
                     {
                         std::lock_guard<std::mutex> lock(pur_mutex);
+                        /*
                         std::copy(subregions.begin(), subregions.end(),
                                 std::back_inserter(potentiallyUnsafeRegions)
                                 );
-                        /*
+                        */
                         std::copy(subregions.begin(), subregions.end(),
                                 std::inserter(potentiallyUnsafeRegions,
                                     potentiallyUnsafeRegions.begin())
                                 );
-                        */
                     }
                 }
                 else if(verification_result.first ==
@@ -154,10 +154,21 @@ void ARFramework::worker_routine()
                     auto subregions = refinement_strategy(selected_region);
                     std::map<grid::region, grid::point, grid::region_less_compare> unsafeRegionsTmp;
                     std::set<grid::point> all_abstracted_points;
+                    auto first_iter = true;
                     for(auto&& subregion : subregions)
                     {
                         auto abstracted_points = 
                             abstraction_strategy(subregion);
+                        if(first_iter)
+                        {
+                            auto abstraction_orig = 
+                                abstraction_strategy(selected_region);
+                            std::copy(abstraction_orig.begin(),
+                                    abstraction_orig.end(),
+                                    std::back_inserter(
+                                        abstracted_points));
+                            first_iter = false;
+                        }
                         for(auto&& pt : abstracted_points)
                         {
                             auto discrete_pt = grid::enforceSnapDiscreteGrid(
@@ -186,22 +197,23 @@ void ARFramework::worker_routine()
                             }
                         }
                     }
-                    /*
-                    std::cout << "abstracted " << subregions.size()
-                        << " regions into " << all_abstracted_points.size()
-                        << " points\n";
-                    */
+
+                    std::set<grid::region, grid::region_less_compare> 
+                        deleted_regions;
                     for(auto&& pt : all_abstracted_points)
                     {
                         if(safety_predicate(pt)) continue;
+                        auto in_deleted = deleted_regions.find(pt);
+                        if(deleted_regions.end() != in_deleted)
+                            continue;
                         auto found_subregion = subregions.find(pt);
                         if(subregions.end() != found_subregion)
                         {
                             unsafeRegionsTmp.insert(
                                     {*found_subregion, pt});
+                            deleted_regions.insert(*found_subregion);
                             subregions.erase(found_subregion);
                         }
-                        /*
                         else
                         {
                             std::lock_guard<std::mutex> lock(pur_mutex);
@@ -216,7 +228,6 @@ void ARFramework::worker_routine()
                                         found_region);
                             }
                         }
-                        */
                     }
                     {
                         std::lock_guard<std::mutex> lock(ur_mutex);
@@ -229,16 +240,16 @@ void ARFramework::worker_routine()
                     }
                     {
                         std::lock_guard<std::mutex> lock(pur_mutex);
+                        /*
                         std::copy(subregions.begin(),
                                 subregions.end(),
                                 std::back_inserter(potentiallyUnsafeRegions)
                                 );
-                        /*
+                        */
                         std::copy(subregions.begin(),
                                 subregions.end(),
                                 std::inserter(potentiallyUnsafeRegions,
                                     potentiallyUnsafeRegions.begin()));
-                        */
                     }
                 }
             }
@@ -298,16 +309,16 @@ void ARFramework::worker_routine()
                 }
                 {
                     std::lock_guard<std::mutex> lock(pur_mutex);
+                    /*
                     std::copy(nonempty_subregions.begin(), 
                             nonempty_subregions.end(), 
                             std::back_inserter(potentiallyUnsafeRegions)
                             );
-                    /*
+                    */
                     std::copy(nonempty_subregions.begin(), 
                             nonempty_subregions.end(), 
                             std::inserter(potentiallyUnsafeRegions, 
                                 potentiallyUnsafeRegions.begin()));
-                    */
                 }
             }
         }
