@@ -388,6 +388,11 @@ grid::ModifiedFGSMWithFallbackRegionAbstraction::operator()(grid::region const& 
     if(centralPointSet.empty()) return {};
     auto p = *centralPointSet.begin();
     auto grad_sign = grid::sign(gradient(p));
+    /*
+    for(auto&& elem : grad_sign)
+        std::cout << elem << " ";
+    std::cout << "\n\n";
+    */
     auto min_dimension = 
         std::min_element(r.begin(), r.end(),
                 [](grid::region_element const& a,
