@@ -439,7 +439,9 @@ grid::ModifiedFGSMWithFallbackRegionAbstraction::operator()(grid::region const& 
 
     grid::abstraction_strategy_return_t retVal;
     retVal.reserve(maxPoints);
-    for(auto i = 1; i < maxPoints+1 && i <= e1_upperbound; ++i)
+    for(int i = e1_upperbound; 
+            i >= e1_lowerbound && e1_upperbound - i < maxPoints; 
+            --i)
     {
         auto e1 = 
             granularity[min_dimension_index] * (long double)i;

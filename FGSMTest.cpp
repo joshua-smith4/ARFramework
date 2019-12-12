@@ -227,9 +227,14 @@ int main(int argc, char* argv[])
 
     auto abstractions = abstraction_strategy(orig_region);
     std::set<grid::point> unique_abstractions;
-    std::copy(abstractions.begin(), abstractions.end(),
-            std::inserter(unique_abstractions, 
-                unique_abstractions.begin()));
+    for(auto&& pt : abstractions)
+    {
+        auto discrete_pt = grid::enforceSnapDiscreteGrid(
+                pt, init_act_point, granularity);
+        auto snapped_pt = grid::snapToDomainRange(discrete_pt, 
+                domain_range);
+        unique_abstractions.insert(snapped_pt);
+    }
     std::cout << "Unique Abstractions: " 
         << unique_abstractions.size() << "\n";
 
@@ -241,7 +246,7 @@ int main(int argc, char* argv[])
                         &graph_tool::parseGraphOutToVector,
                         {output_layer});
                 if(!gm.ok())
-                    LOG(ERROR) << "GM Error in isPointSafe";
+                    LOG(ERROR) << "GM Error in pointIsSafe";
                 auto class_out = 
                     graph_tool::getClassOfClassificationVector(
                             logits_out);
