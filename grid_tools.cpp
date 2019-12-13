@@ -398,7 +398,7 @@ grid::ModifiedFGSMWithFallbackRegionAbstraction::operator()(grid::region const& 
 
     auto min_dimension_index = std::distance(r.begin(), min_dimension);
     auto max_radius = 
-        (min_dimension->second - min_dimension->first) / (long double)2.0;
+        (min_dimension->second - min_dimension->first) / (long double)1.25;
     if(r.end() == min_dimension || 
             max_radius <= granularity[min_dimension_index])
     {

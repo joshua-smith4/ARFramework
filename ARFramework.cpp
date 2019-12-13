@@ -37,6 +37,7 @@ ARFramework::ARFramework(
         LOG(ERROR) << "Invalid original region";
         exit(1);
     }
+    //potentiallyUnsafeRegions.push_back(orig_region);
     potentiallyUnsafeRegions.insert(orig_region);
 }
 
@@ -203,9 +204,11 @@ void ARFramework::worker_routine()
                     for(auto&& pt : all_abstracted_points)
                     {
                         if(safety_predicate(pt)) continue;
+                        /*
                         auto in_deleted = deleted_regions.find(pt);
                         if(deleted_regions.end() != in_deleted)
                             continue;
+                        */
                         auto found_subregion = subregions.find(pt);
                         if(subregions.end() != found_subregion)
                         {
