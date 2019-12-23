@@ -386,25 +386,22 @@ grid::ModifiedFGSMWithFallbackRegionAbstraction::operator()(grid::region const& 
 {
     auto centralPointSet = grid::centralPointRegionAbstraction(r);
     if(centralPointSet.empty()) return {};
+
     auto p = *centralPointSet.begin();
     auto grad_sign = grid::sign(gradient(p));
-    /*
-    for(auto&& elem : grad_sign)
-        std::cout << elem << " ";
-    std::cout << "\n\n";
-    */
+
     auto min_dimension = 
         std::min_element(r.begin(), r.end(),
                 [](grid::region_element const& a,
                     grid::region_element const& b)
                 { return a.second - a.first < b.second - b.first; });
+
     auto min_dimension_index = std::distance(r.begin(), min_dimension);
     auto max_radius = 
-        (min_dimension->second - min_dimension->first) / (long double)2.0;
+        (min_dimension->second - min_dimension->first) / (long double)1.25;
     if(r.end() == min_dimension || 
             max_radius <= granularity[min_dimension_index])
     {
-        //std::cout << "falling back\n";
         return fallback_strategy(r);
     }
 
@@ -421,14 +418,16 @@ grid::ModifiedFGSMWithFallbackRegionAbstraction::operator()(grid::region const& 
         Mnot[dims[i]] = 0.0;
     }
 
-    auto e1_lowerbound = (long double)granularity[min_dimension_index];
-    auto e1_upperbound = (long double)max_radius;
+    auto e1_lowerbound = 1;
+    auto e1_upperbound = 
+        static_cast<int>(max_radius / granularity[min_dimension_index]);
     auto e2_lowerbound = (long double)0.0;
-    auto e2_upperbound = (long double)max_radius / e1_lowerbound - 1.0;
+    auto e2_upperbound = 
+        (long double)max_radius / granularity[min_dimension_index] - 1.0;
 
     //std::default_random_engine rand_gen;
     auto dist_e1 = 
-        std::uniform_real_distribution<long double>(
+        std::uniform_int_distribution<int>(
                 e1_lowerbound, e1_upperbound);
     auto dist_e2 = 
         std::uniform_real_distribution<long double>(
@@ -437,9 +436,12 @@ grid::ModifiedFGSMWithFallbackRegionAbstraction::operator()(grid::region const& 
 
     grid::abstraction_strategy_return_t retVal;
     retVal.reserve(maxPoints);
-    for(auto i = 0u; i < maxPoints; ++i)
+    for(int i = e1_upperbound; 
+            i >= e1_lowerbound && e1_upperbound - i < maxPoints; 
+            --i)
     {
-        auto e1 = dist_e1(rand_gen); 
+        auto e1 = 
+            granularity[min_dimension_index] * (long double)i;
         auto e2 = dist_e2(rand_gen);
         grid::point R(r.size());
         for(auto&& elem : R)

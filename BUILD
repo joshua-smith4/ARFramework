@@ -55,3 +55,28 @@ tf_cc_binary(
     ],
 )
 
+tf_cc_binary(
+    name = "ARFramework_FGSM_test",
+    srcs = [
+        "FGSMTest.cpp",
+        "grid_tools.cpp",
+        "GraphManager.cpp",
+        "tensorflow_graph_tools.cpp",
+    ],
+    includes = [
+        "grid_tools.hpp",
+        "GraphManager.hpp",
+        "tensorflow_graph_tools.hpp",
+    ],
+    linkopts = ["-lm"],
+    deps = [
+        "//tensorflow/cc:cc_ops",
+        "//tensorflow/core:core_cpu",
+        "//tensorflow/core:framework",
+        "//tensorflow/core:framework_internal",
+        "//tensorflow/core:lib",
+        "//tensorflow/core:protos_all_cc",
+        "//tensorflow/core:tensorflow",
+    ],
+)
+
