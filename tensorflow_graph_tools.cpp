@@ -21,7 +21,7 @@ unsigned graph_tool::getClassOfClassificationTensor(
 
 tensorflow::Tensor graph_tool::pointToTensor(
         grid::point const& p,
-        std::vector<int64_t> const& shape) 
+        std::vector<tensorflow::int64> const& shape) 
 {
     tensorflow::Tensor retVal(tensorflow::DT_FLOAT,
             tensorflow::TensorShape(shape));
@@ -33,9 +33,9 @@ tensorflow::Tensor graph_tool::pointToTensor(
 
 tensorflow::Tensor graph_tool::pointsToTensor(
         std::vector<grid::point> const& p,
-        std::vector<int64_t> const& shapeOfEachPoint) 
+        std::vector<tensorflow::int64> const& shapeOfEachPoint) 
 {
-    std::vector<int64_t> shape = {static_cast<int64_t>(p.size())};
+    std::vector<tensorflow::int64> shape = {static_cast<tensorflow::int64>(p.size())};
     std::copy(shapeOfEachPoint.begin(), shapeOfEachPoint.end(),
             std::back_inserter(shape));
     tensorflow::Tensor retVal(tensorflow::DT_FLOAT,
@@ -79,7 +79,7 @@ std::vector<grid::point> graph_tool::tensorToPoints(
 graph_tool::feed_dict_type_t graph_tool::makeFeedDict(
         std::string const& input_name, 
         grid::point const& p,
-        std::vector<int64_t> const& shape)
+        std::vector<tensorflow::int64> const& shape)
 {
     return {{input_name, graph_tool::pointToTensor(p, shape)}};
 }
