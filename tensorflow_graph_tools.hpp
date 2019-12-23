@@ -21,11 +21,11 @@ namespace graph_tool
 
     tensorflow::Tensor pointToTensor(
             grid::point const&,
-            std::vector<int64_t> const&);
+            std::vector<tensorflow::int64> const&);
 
     tensorflow::Tensor pointsToTensor(
             std::vector<grid::point> const&,
-            std::vector<int64_t> const&);
+            std::vector<tensorflow::int64> const&);
 
     grid::point tensorToPoint(
             tensorflow::Tensor const&);
@@ -38,7 +38,7 @@ namespace graph_tool
     feed_dict_type_t makeFeedDict(
             std::string const&, 
             grid::point const&, 
-            std::vector<int64_t> const&);
+            std::vector<tensorflow::int64> const&);
 
     grid::point parseGraphOutToVector(std::vector<tensorflow::Tensor> const&);
     

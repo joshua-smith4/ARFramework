@@ -135,9 +135,9 @@ int main(int argc, char* argv[])
     // --------------
 
     // first dimension is the batch size
-    std::vector<int64_t> batch_input_shape(numberOfInputDimensions);
+    std::vector<tensorflow::int64> batch_input_shape(numberOfInputDimensions);
     // this is the size of a single input to the model
-    std::vector<int64_t> input_shape(numberOfInputDimensions - 1);
+    std::vector<tensorflow::int64> input_shape(numberOfInputDimensions - 1);
     for(auto i = 0u; i < numberOfInputDimensions; ++i)
     {
         if(i != 0)

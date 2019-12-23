@@ -5,6 +5,7 @@
 #include <thread>
 #include <atomic>
 #include <mutex>
+#include <deque>
 
 #include "tensorflow/core/lib/io/path.h"
 #include "tensorflow/core/lib/strings/str_util.h"
