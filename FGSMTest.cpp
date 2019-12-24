@@ -100,7 +100,7 @@ int main(int argc, char* argv[])
     auto init_act_point = graph_tool::tensorToPoint(
             init_act_tensor);
 
-    std::vector<int64_t> batch_input_shape(init_act_tensor.dims());
+    std::vector<tensorflow::int64> batch_input_shape(init_act_tensor.dims());
 
     for(auto i = 0u; i < batch_input_shape.size(); ++i)
         batch_input_shape[i] = init_act_tensor.dim_size(i);
