@@ -1,0 +1,3 @@
+# ARFramework
+
+bazel build -c opt --copt=-mavx --copt=-mavx2 --copt=-mfma --copt=-msse4.2 --verbose_failures --jobs=16 --config=noaws --config=nogcp --config=noignite --config=nokafka --config=nonccl --config=c++17 -s //tensorflow/ARFramework/...
