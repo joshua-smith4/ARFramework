@@ -87,7 +87,11 @@ public:
         log_status();
         for(auto&& adv_exp_pair : unsafeRegionsWithAdvExamples)
         {
-            cb(adv_exp_pair.second);
+            adversarialExamples.insert(adv_exp_pair.second);
+        }
+        for(auto&& adv_example : adversarialExamples)
+        {
+            cb(adv_example);
         }
     }
 };

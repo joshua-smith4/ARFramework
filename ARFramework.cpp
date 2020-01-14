@@ -211,6 +211,10 @@ void ARFramework::worker_routine()
                         if(deleted_regions.end() != in_deleted)
                             continue;
                         */
+                        {
+                            std::lock_guard<std::mutex> lock(ae_mutex);
+                            adversarialExamples.insert(pt);
+                        }
                         auto found_subregion = subregions.find(pt);
                         if(subregions.end() != found_subregion)
                         {
