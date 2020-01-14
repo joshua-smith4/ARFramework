@@ -30,6 +30,8 @@ private:
     std::map<grid::region, grid::point, grid::region_less_compare> 
         unsafeRegionsWithAdvExamples;
     std::mutex ur_mutex;
+    std::set<grid::point> adversarialExamples;
+    std::mutex ae_mutex;
     bool keep_working;
     GraphManager& gm;
     grid::region domain_range;

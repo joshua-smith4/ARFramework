@@ -18,6 +18,8 @@ ARFramework::ARFramework(
         sr_mutex(),
         unsafeRegionsWithAdvExamples(),
         ur_mutex(),
+        adversarialExamples(),
+        ae_mutex(),
         keep_working(true),
         gm(graph_manager),
         domain_range(dr),
