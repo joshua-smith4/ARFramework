@@ -45,10 +45,12 @@ ARFramework::ARFramework(
 
 void ARFramework::log_status()
 {
-    std::cout << "Potentially Unsafe Regions: " 
+    std::cout << "Unverified Regions: " 
         << potentiallyUnsafeRegions.size() << "\n";
     std::cout << "Unsafe Regions: " 
         << unsafeRegionsWithAdvExamples.size() << "\n";
+    std::cout << "Adversarial Examples: "
+        << adversarialExamples.size() << "\n";
     std::cout << "Safe Regions: " << safeRegions.size() << "\n";
 }
 
