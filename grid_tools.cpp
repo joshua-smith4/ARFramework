@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <numeric>
 #include <cmath>
+#include <limits>
 
 #include "grid_tools.hpp"
 
@@ -12,10 +13,10 @@ grid::region grid::snapToDomainRange(
     grid::region retVal(r);
     for(auto i = 0u; i < r.size(); ++i)
     {
-        if(retVal[i].first < r[i].first) retVal[i].first = r[i].first;
-        if(retVal[i].second < r[i].first) retVal[i].second = r[i].first;
-        if(retVal[i].first > r[i].second) retVal[i].first = r[i].second;
-        if(retVal[i].second > r[i].second) retVal[i].second = r[i].second;
+        if(retVal[i].first < range[i].first) retVal[i].first = range[i].first;
+        if(retVal[i].second < range[i].first) retVal[i].second = range[i].first;
+        if(retVal[i].first > range[i].second) retVal[i].first = range[i].second;
+        if(retVal[i].second > range[i].second) retVal[i].second = range[i].second;
     }
     return retVal;
 }
@@ -171,6 +172,7 @@ grid::AllValidDiscretizedPointsAbstraction::operator()(
     return retVal;
 }
 
+// protected with overflow check, result may be too large to be exact
 unsigned long long 
 grid::AllValidDiscretizedPointsAbstraction::getNumberValidPoints(
         grid::region const& r,// region in question 
@@ -178,7 +180,10 @@ grid::AllValidDiscretizedPointsAbstraction::getNumberValidPoints(
         grid::point const& g) // granularity
 {
     auto validPointInRegion = findValidPointInRegion(r, p, g);
-    if(!validPointInRegion.first) return 0ull;
+    if(!validPointInRegion.first) 
+    {
+        return 0ull;
+    }
     auto retVal = 1ull;
     for(auto i = 0u; i < r.size(); ++i)
     {
@@ -187,7 +192,13 @@ grid::AllValidDiscretizedPointsAbstraction::getNumberValidPoints(
             static_cast<unsigned long long>(
                     ceil((r[i].second - validPointInRegion.second[i])
                     / g[i]));
-        retVal *= numPointsInDim;
+        if(numPointsInDim == 0ull) return 0;
+        if(retVal < 
+                std::numeric_limits<unsigned long long>::max() 
+                / numPointsInDim)
+        {
+            retVal *= numPointsInDim;
+        }
     }
     return retVal;
 }
@@ -405,7 +416,6 @@ grid::ModifiedFGSMWithFallbackRegionAbstraction::operator()(grid::region const& 
         return fallback_strategy(r);
     }
 
-    //std::cout << "using fgsm\n";
     auto dims = dim_select_strategy(r, r.size());
     auto numDimsFGSM = 
         static_cast<unsigned>(

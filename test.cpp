@@ -9,6 +9,7 @@
 int main()
 {
     std::set<grid::region, grid::region_less_compare> region_set;
+    std::set<grid::point> pts;
 
     grid::region reg1 = {{1,2},{0,3},{2,7}};
     grid::region reg2 = {{1,2},{0,3},{7,9}};
@@ -18,6 +19,21 @@ int main()
     grid::point p1 = { 1,0,2 };
     grid::point p2 = {1,3,7};
     grid::point p3 = {1,2,7};
+    grid::point p4 = {1,2,7};
+    grid::point p5 = {2,2,0};
+    grid::point p6 = {1,2,6};
+    grid::point p7 = {1,2,1};
+    grid::point p8 = {1,2,7};
+
+    pts.insert(p1);
+    pts.insert(p2);
+    pts.insert(p3);
+    pts.insert(p4);
+    pts.insert(p5);
+    pts.insert(p6);
+    pts.insert(p7);
+    pts.insert(p8);
+    assert(pts.size() == 6);
 
     region_set.insert(reg1);
     region_set.insert(reg2);

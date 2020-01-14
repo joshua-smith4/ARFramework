@@ -2,6 +2,12 @@ from tensorflow.keras.datasets import mnist
 from tensorflow.keras import backend as K
 import tensorflow as tf
 import numpy as np
+import argparse
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument("-i", "--index", default=1, type=int)
+args = parser.parse_args()
 
 (x_train, y_train), (x_test, y_test) = mnist.load_data()
 
@@ -22,12 +28,11 @@ x_train /= 255
 
 y_train = tf.keras.utils.to_categorical(y_train, 10)
 
-index = 200
-x_init = x_train[index:index+1]
-y_init = y_train[index:index+1]
+x_init = x_train[args.index:args.index+1]
+y_init = y_train[args.index:args.index+1]
 
-file_name_x = 'mnist_{}.pb'.format(index) 
-file_name_y = 'mnist_{}_label.pb'.format(index) 
+file_name_x = 'mnist_{}.pb'.format(args.index) 
+file_name_y = 'mnist_{}_label.pb'.format(args.index) 
 
 x_proto = tf.make_tensor_proto(
         x_init, dtype=x_init.dtype, shape=x_init.shape)

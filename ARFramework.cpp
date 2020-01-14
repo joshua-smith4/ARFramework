@@ -34,6 +34,10 @@ ARFramework::ARFramework(
 {
     if(!gm.ok()) exit(1);
     orig_region = grid::snapToDomainRange(orig_region, domain_range);
+    /*
+    for(auto&& row : orig_region)
+        std::cout << row.first << " " << row.second << "\n";
+    */
     if(!grid::isValidRegion(orig_region))
     {
         LOG(ERROR) << "Invalid original region";
@@ -98,17 +102,29 @@ void ARFramework::worker_routine()
                         got_valid_region = true;
                     }
                 }
-                if(!got_valid_region) continue;
+                if(!got_valid_region)
+                {
+                    continue;
+                }
                 selected_region = grid::snapToDomainRange(
                         selected_region,
                         domain_range);
-                auto numValidPoints = 
+                /*
+                for(auto&& elem : granularity)
+                    std::cout << elem << " ";
+                std::cout << "\n";
+                */
+                unsigned long long numValidPoints = 
                     grid::AllValidDiscretizedPointsAbstraction
                     ::getNumberValidPoints(
                             selected_region,
                             init_point,
                             granularity);
-                if(numValidPoints <= 0) continue;
+                //std::cout << numValidPoints << std::endl;
+                if(numValidPoints <= 0u) 
+                {
+                    continue;
+                }
                 auto verification_result = 
                     verification_engine(selected_region);
                 if(verification_result.first ==
@@ -237,6 +253,11 @@ void ARFramework::worker_routine()
                                         {*found_region, pt});
                                 potentiallyUnsafeRegions.erase(
                                         found_region);
+                                //std::cout << "found in pot unsafe regions\n";
+                            }
+                            else
+                            {
+                                //std::cout << "not found anywhere\n";
                             }
                         }
                     }
