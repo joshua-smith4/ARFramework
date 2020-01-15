@@ -6,7 +6,7 @@ ARFramework::ARFramework(
         grid::region dr,
         grid::point ip,
         grid::point gran,
-        grid::region orig_region,
+        grid::region orig_r,
         std::function<bool(grid::point const&)> const& safety_pred,
         grid::verification_engine_type_t const& verif_engine, 
         grid::region_abstraction_strategy_t const& abs_strat, 
@@ -30,10 +30,11 @@ ARFramework::ARFramework(
         verification_engine(verif_engine),
         safety_predicate(safety_pred),
         logging_thread_id(),
-        log_thread_set(ATOMIC_FLAG_INIT)
+        log_thread_set(ATOMIC_FLAG_INIT),
+        orig_region()
 {
     if(!gm.ok()) exit(1);
-    orig_region = grid::snapToDomainRange(orig_region, domain_range);
+    orig_region = grid::snapToDomainRange(orig_r, domain_range);
     /*
     for(auto&& row : orig_region)
         std::cout << row.first << " " << row.second << "\n";
@@ -202,7 +203,8 @@ void ARFramework::worker_routine()
                                     pt,
                                     domain_range);
                             */
-                            if(grid::isInDomainRange(snapped_pt, domain_range))
+                            if(grid::isInDomainRange(
+                                        snapped_pt, orig_region))
                             {
                                 /*
                                 all_abstracted_points.push_back(
@@ -211,11 +213,13 @@ void ARFramework::worker_routine()
                                 all_abstracted_points.insert(
                                         snapped_pt);
                             }
+                            /*
                             else
                             {
                                 LOG(ERROR)
                                     << "Point was outside domain range\n";
                             }
+                            */
                         }
                     }
 
@@ -224,8 +228,6 @@ void ARFramework::worker_routine()
                     for(auto&& pt : all_abstracted_points)
                     {
                         if(safety_predicate(pt)) continue;
-                        if(!grid::isInDomainRange(pt, orig_region))
-                            std::cout << "outside orig_region\n";
                         /*
                         auto in_deleted = deleted_regions.find(pt);
                         if(deleted_regions.end() != in_deleted)

@@ -45,6 +45,7 @@ private:
     std::function<bool(grid::point const&)> safety_predicate;
     std::thread::id logging_thread_id;
     std::atomic_flag log_thread_set;
+    grid::region orig_region;
 
     void worker_routine();
     void log_status();

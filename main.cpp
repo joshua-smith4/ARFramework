@@ -391,7 +391,6 @@ int main(int argc, char* argv[])
     auto timestamp = std::string(buffer);
     auto report_function = [&](grid::point const& adv_exp)
     {
-        /*
         static unsigned index = 0;
         std::vector<float> tmp(adv_exp.begin(), adv_exp.end());
         std::vector<std::size_t> tmp_size(batch_input_shape.begin(),
@@ -412,7 +411,8 @@ int main(int argc, char* argv[])
         file_name << timestamp 
             << "_" << index << "_" << orig_class << "_" 
             << classification << ".pb";
-        //std::cout << "Class of adversarial example: " << classification << "\n";
+        std::cout << "Class of adversarial example: " 
+            << classification << "\n";
         ++index;
         auto file_path = tensorflow::io::JoinPath(output_dir, 
                 file_name.str());
@@ -425,7 +425,6 @@ int main(int argc, char* argv[])
         {
             LOG(ERROR) << "Couldn't write file " << file_path;
         }
-        */
     };
     std::cout << "reporting...\n";
 
