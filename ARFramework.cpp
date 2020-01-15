@@ -224,6 +224,8 @@ void ARFramework::worker_routine()
                     for(auto&& pt : all_abstracted_points)
                     {
                         if(safety_predicate(pt)) continue;
+                        if(!grid::isInDomainRange(pt, orig_region))
+                            std::cout << "outside orig_region\n";
                         /*
                         auto in_deleted = deleted_regions.find(pt);
                         if(deleted_regions.end() != in_deleted)
