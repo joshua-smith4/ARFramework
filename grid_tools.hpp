@@ -171,6 +171,17 @@ namespace grid
     dim_selection_strategy_return_t maxAverageDimSelection(region const&, 
             std::size_t);
 
+    struct GradientBasedDimensionSelection
+    {
+    public:
+        GradientBasedDimensionSelection(
+                std::function<point(point const&)> const& /*gradient*/);
+        dim_selection_strategy_return_t operator()(
+                region const&, std::size_t);
+    private:
+        std::function<point(point const&)> grad;
+    };
+
     numeric_type_t l2norm(point const&);
 
     // dimension selection algorithm defined in

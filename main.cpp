@@ -38,7 +38,6 @@ int main(int argc, char* argv[])
     std::string verification_radius = "verification radius";
     std::string initial_activation = "initial_activation.pb";
     std::string root_dir = ".";
-    std::string number_of_dimensions = "numdimensions";
     std::string class_averages = "class_averages";
     std::string label_proto = "label_proto";
     std::string label_layer = "label_layer_placeholder";
@@ -46,24 +45,27 @@ int main(int argc, char* argv[])
     std::string num_threads_str = "4";
     std::string num_abstractions_str = "1";
     std::string output_dir = "adv_examples";
+    std::string refinement_dim_selection = "largest_first";
+    std::string modified_fgsm_dim_selection = "intellifeature";
 
     std::vector<tensorflow::Flag> flag_list = {
-        tensorflow::Flag("graph", &graph, "path to protobuf graph to be executed"),
+        tensorflow::Flag("graph", &graph, "path to protobuf graph to be executed - root_dir/graph"),
         tensorflow::Flag("input_layer", &input_layer, "name of input layer"),
         tensorflow::Flag("output_layer", &output_layer, "name of output layer"),
         tensorflow::Flag("gradient_layer", &gradient_layer, "name of the gradient layer (optional - used for FGSM)"),
-        tensorflow::Flag("granularity", &granularity, "use this option is all dimensions share a discrete range"),
+        tensorflow::Flag("granularity", &granularity, "use this option if all dimensions share a discrete range"),
         tensorflow::Flag("verification_radius", &verification_radius, "'radius' of hyperrectangle within which safety is to be verified"),
-        tensorflow::Flag("initial_activation", &initial_activation, "initial tested activation"),
-        tensorflow::Flag("number_of_dimensions", &number_of_dimensions, "number of dimensions to verify with provided radius"),
-        tensorflow::Flag("root_dir", &root_dir, "root_dir"),
-        tensorflow::Flag("class_averages", &class_averages, "the class averages of the training data (optional - used for FGSM)"),
-        tensorflow::Flag("label_proto", &label_proto, "protocol buffer of label image corresponding with initial activation"),
-        tensorflow::Flag("label_layer", &label_layer, "name of label layer"),
+        tensorflow::Flag("initial_activation", &initial_activation, "initial tested activation - root_dir/initial_activation.pb"),
+        tensorflow::Flag("root_dir", &root_dir, "root directory holding resources such as the graph, intial_activation, class_averages, etc protobufs"),
+        tensorflow::Flag("class_averages", &class_averages, "the class averages of the training data (optional - used for Intellifeature)"),
+        tensorflow::Flag("label_proto", &label_proto, "protocol buffer of label image corresponding with initial activation (optional - used in FGSM)"),
+        tensorflow::Flag("label_layer", &label_layer, "name of input label layer"),
         tensorflow::Flag("fgsm_balance_factor", &fgsm_balance_factor_opt, "Balance factor for modified FGSM algorithm (ratio dimensions fgsm/random)"),
         tensorflow::Flag("num_threads", &num_threads_str, "number of threads to use"),
-        tensorflow::Flag("num_abstractions", &num_abstractions_str, "number of points to use as abstractions"),
-        tensorflow::Flag("output_dir", &output_dir, "location of adversarial example output")
+        tensorflow::Flag("num_abstractions", &num_abstractions_str, "number of points to use as abstractions for each region"),
+        tensorflow::Flag("output_dir", &output_dir, "directory where adversarial examples and other output should be saved"),
+        tensorflow::Flag("refinement_dim_selection", &refinement_dim_selection, "strategy to use for hierarchical dimension refinement"),
+        tensorflow::Flag("modified_fgsm_dim_selection", &modified_fgsm_dim_selection, "dimension selection strategy to use for modified FGSM")
     };
 
     std::string usage = tensorflow::Flags::Usage(argv[0], flag_list);
@@ -121,8 +123,6 @@ int main(int argc, char* argv[])
             init_act_tensor);
 
 
-    auto verifySubsetOfDimensions = number_of_dimensions != "numdimensions";
-    auto numDimensionsToVerify = verifySubsetOfDimensions ? atoi(number_of_dimensions.c_str()) : init_act_point.size();
     auto numberOfInputDimensions = init_act_tensor.dims();
     auto flattenedNumDims = 1ull;
 
@@ -191,7 +191,6 @@ int main(int argc, char* argv[])
     for(auto&& elem : batch_input_shape)
         std::cout << elem << " ";
     std::cout << "\n";
-    std::cout << "Number of dimensions: " << numDimensionsToVerify << "\n";
     std::cout << "Verification radius: " << radius << "\n";
     std::cout << "Root Directory: " << root_dir << "\n";
     std::cout << "Output Directory: " << output_dir << "\n";
@@ -207,13 +206,13 @@ int main(int argc, char* argv[])
 
     grid::dimension_selection_strategy_t dimension_selection_strategy = 
         grid::largestDimFirst;
-    /*
-    grid::dimension_selection_strategy_t dimension_selection_strategy = 
-        grid::randomDimSelection;
-    */
+    if(refinement_dim_selection == "random")
+    {
+        std::cout << "Using random dimension selection strategy for partitioning\n";
+        dimension_selection_strategy = grid::randomDimSelection;
+    }
 
-    grid::dimension_selection_strategy_t 
-        intellifeature_selection_strategy = 
+    grid::dimension_selection_strategy_t modified_fgsm_selection_strategy = 
         grid::randomDimSelection;
 
     grid::region_abstraction_strategy_t abstraction_strategy = 
@@ -224,17 +223,8 @@ int main(int argc, char* argv[])
     */
 
     auto hasAveragesProto = class_averages != "class_averages";
-    auto hasLabelProto = label_proto != "label_proto";
-    auto hasLabelLayer = label_layer != "label_layer_placeholder";
-    auto canUseGradient = 
-        hasGradientLayer 
-        && hasAveragesProto 
-        && hasLabelProto 
-        && hasLabelLayer;
-
-    if(canUseGradient)
+    if(hasAveragesProto && (refinement_dim_selection == "intellifeature" || modified_fgsm_dim_selection == "intellifeature"))
     {
-        std::cout << "Using IntellifeatureFGSM\n";
         std::string class_averages_path = 
             tensorflow::io::JoinPath(root_dir, class_averages);
         auto class_averages_proto_pair = 
@@ -246,11 +236,37 @@ int main(int argc, char* argv[])
         }
         auto averages = graph_tool::tensorToPoints(
                 class_averages_proto_pair.second);
-        intellifeature_selection_strategy = 
-            grid::IntellifeatureDimSelection(
-                averages,
-                &grid::l2norm,
-                orig_class);
+        if(refinement_dim_selection == "intellifeature")
+        {
+            std::cout << "Using Intellifeature for refinement dimension selection\n";
+            dimension_selection_strategy = 
+                grid::IntellifeatureDimSelection(
+                    averages,
+                    &grid::l2norm,
+                    orig_class);
+        }
+        if(modified_fgsm_dim_selection == "intellifeature")
+        {
+            std::cout << "Using Intellifeature for modified FGSM dimension selection\n";
+            modified_fgsm_selection_strategy = 
+                grid::IntellifeatureDimSelection(
+                    averages,
+                    &grid::l2norm,
+                    orig_class);
+        }
+    }
+
+    auto hasLabelProto = label_proto != "label_proto";
+    auto hasLabelLayer = label_layer != "label_layer_placeholder";
+    auto canUseGradient = 
+        hasGradientLayer 
+        && hasLabelProto 
+        && hasLabelLayer;
+
+    if(canUseGradient)
+    {
+        std::cout << "Using Modified FGSM: " 
+            << fgsm_balance_factor << "\n";
         auto label_tensor_path = 
             tensorflow::io::JoinPath(root_dir, label_proto);
         auto label_tensor_pair =
@@ -261,9 +277,7 @@ int main(int argc, char* argv[])
             exit(1);
         }
         auto label_tensor = label_tensor_pair.second;
-        abstraction_strategy = 
-            grid::ModifiedFGSMWithFallbackRegionAbstraction(
-                num_abstractions,
+        auto grad_func = 
                 [&,label_tensor_copy = label_tensor]
                 (grid::point const& p) -> grid::point
                 {
@@ -282,11 +296,27 @@ int main(int argc, char* argv[])
                     if(!gm.ok())
                         LOG(ERROR) << "Error with model";
                     return retVal;
-                },
-                intellifeature_selection_strategy,
+                };
+        if(modified_fgsm_dim_selection == "gradient_based")
+        {
+            std::cout << "Using gradient-based dimension selection for modified FGSM abstraction strategy\n";
+            modified_fgsm_selection_strategy = 
+                grid::GradientBasedDimensionSelection(grad_func);
+        }
+        abstraction_strategy = 
+            grid::ModifiedFGSMWithFallbackRegionAbstraction(
+                num_abstractions,
+                grad_func,
+                modified_fgsm_selection_strategy,
                 grid::RandomPointRegionAbstraction(2u),
                 granularity_parsed,
                 fgsm_balance_factor);
+        if(refinement_dim_selection == "gradient_based")
+        {
+            std::cout << "Using gradient-based dimension selection strategy for partitioning\n";
+            dimension_selection_strategy = 
+                grid::GradientBasedDimensionSelection(grad_func);
+        }
     }
 
     grid::region_refinement_strategy_t refinement_strategy = 
