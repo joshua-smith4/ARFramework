@@ -324,6 +324,29 @@ grid::maxAverageDimSelection(grid::region const& r, std::size_t numDims)
     return {indices.begin(), indices.begin() + numDims};
 }
 
+grid::GradientBasedDimensionSelection
+    ::GradientBasedDimensionSelection(
+            std::function<point(point const&)> const& gradient)
+    : grad(gradient)
+{
+}
+
+grid::dim_selection_strategy_return_t
+grid::GradientBasedDimensionSelection::operator()(
+        grid::region const& r, std::size_t numDims)
+{
+    if(numDims > r.size()) 
+        return {};
+    auto centralPoint = grid::centralPointRegionAbstraction(r);
+    if(centralPoint.empty()) return {};
+    auto p = *centralPoint.begin();
+    auto gradient = grad(p);
+    for(auto&& elem : gradient)
+        elem = std::abs(elem);
+    auto indices = getSortedIndices(gradient, false);
+    return {indices.begin(), indices.begin() + numDims};
+}
+
 long double grid::l2norm(grid::point const& p)
 {
     grid::numeric_type_t squared_sum = 0;
