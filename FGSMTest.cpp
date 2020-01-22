@@ -27,6 +27,10 @@ int main(int argc, char* argv[])
     std::string label_proto = "label_proto";
     std::string label_layer = "label_layer_placeholder";
     std::string fgsm_balance_factor_opt = "1.0";
+    std::string enforce_granularity_str = "true";
+    std::string enforce_domain_str = "true";
+    std::string domain_range_min_str = "0.0";
+    std::string domain_range_max_str = "1.0";
 
     std::vector<tensorflow::Flag> flag_list = {
         tensorflow::Flag("graph", &graph, "path to protobuf graph to be executed"),
@@ -40,6 +44,10 @@ int main(int argc, char* argv[])
         tensorflow::Flag("class_averages", &class_averages, "the class averages of the training data (optional - used for FGSM)"),
         tensorflow::Flag("label_proto", &label_proto, "protocol buffer of label image corresponding with initial activation"),
         tensorflow::Flag("label_layer", &label_layer, "name of label layer"),
+        tensorflow::Flag("enforce_granularity", &enforce_granularity_str, "enforce the granularity (true, false)"),
+        tensorflow::Flag("enforce_domain", &enforce_domain_str, "enforce the domain range (true, false)"),
+        tensorflow::Flag("domain_range_min", &domain_range_min_str, "lower bound on domain range (default = 0.0)"),
+        tensorflow::Flag("domain_range_max", &domain_range_max_str, "upper bound on domain range (default = 1.0)"),
         tensorflow::Flag("fgsm_balance_factor", &fgsm_balance_factor_opt, "Balance factor for modified FGSM algorithm (ratio dimensions fgsm/random)")
     };
 
@@ -57,6 +65,8 @@ int main(int argc, char* argv[])
         return -1;
     }
 
+    const auto enforce_granularity = enforce_granularity_str == "true";
+    const auto enforce_domain = enforce_domain_str == "true";
     if(gradient_layer == "gradient_layer_tmp_placeholder")
     {
         LOG(ERROR) << "must provide gradient layer\n";
@@ -75,6 +85,8 @@ int main(int argc, char* argv[])
     auto granularity_val = std::atof(granularity_str.c_str());
     auto radius = std::atof(verification_radius.c_str());
     auto fgsm_balance_factor = std::atof(fgsm_balance_factor_opt.c_str());
+    auto domain_range_min = std::atof(domain_range_min_str.c_str());
+    auto domain_range_max = std::atof(domain_range_max_str.c_str());
     auto graph_path = tensorflow::io::JoinPath(root_dir, graph);
     GraphManager gm(graph_path);
     if(!gm.ok())
@@ -219,8 +231,8 @@ int main(int argc, char* argv[])
     grid::region domain_range(orig_region.size());
     for(auto i = 0u; i < domain_range.size(); ++i)
     {
-        domain_range[i].first = 0.0;
-        domain_range[i].second = 1.0;
+        domain_range[i].first = domain_range_min;
+        domain_range[i].second = domain_range_max;
     }
 
     orig_region = grid::snapToDomainRange(orig_region, domain_range);
@@ -229,11 +241,18 @@ int main(int argc, char* argv[])
     std::set<grid::point> unique_abstractions;
     for(auto&& pt : abstractions)
     {
-        auto discrete_pt = grid::enforceSnapDiscreteGrid(
-                pt, init_act_point, granularity);
-        auto snapped_pt = grid::snapToDomainRange(discrete_pt, 
-                domain_range);
-        unique_abstractions.insert(snapped_pt);
+        auto pt_to_add = pt;
+        if(enforce_granularity)
+        {
+            pt_to_add = grid::enforceSnapDiscreteGrid(
+                pt_to_add, init_act_point, granularity);
+        }
+        if(enforce_domain)
+        {
+            pt_to_add = grid::snapToDomainRange(
+                    pt_to_add, domain_range);
+        }
+        unique_abstractions.insert(pt_to_add);
     }
     std::cout << "Unique Abstractions: " 
         << unique_abstractions.size() << "\n";
