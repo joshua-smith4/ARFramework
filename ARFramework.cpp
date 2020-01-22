@@ -35,16 +35,11 @@ ARFramework::ARFramework(
 {
     if(!gm.ok()) exit(1);
     orig_region = grid::snapToDomainRange(orig_r, domain_range);
-    /*
-    for(auto&& row : orig_region)
-        std::cout << row.first << " " << row.second << "\n";
-    */
     if(!grid::isValidRegion(orig_region))
     {
         LOG(ERROR) << "Invalid original region";
         exit(1);
     }
-    //potentiallyUnsafeRegions.push_back(orig_region);
     potentiallyUnsafeRegions.insert(orig_region);
 }
 
@@ -110,18 +105,12 @@ void ARFramework::worker_routine()
                 selected_region = grid::snapToDomainRange(
                         selected_region,
                         domain_range);
-                /*
-                for(auto&& elem : granularity)
-                    std::cout << elem << " ";
-                std::cout << "\n";
-                */
                 unsigned long long numValidPoints = 
                     grid::AllValidDiscretizedPointsAbstraction
                     ::getNumberValidPoints(
                             selected_region,
                             init_point,
                             granularity);
-                //std::cout << numValidPoints << std::endl;
                 if(numValidPoints <= 0u) 
                 {
                     continue;
@@ -257,11 +246,9 @@ void ARFramework::worker_routine()
                                         {*found_region, pt});
                                 potentiallyUnsafeRegions.erase(
                                         found_region);
-                                //std::cout << "found in pot unsafe regions\n";
                             }
                             else
                             {
-                                //std::cout << "not found anywhere\n";
                             }
                         }
                     }

@@ -87,6 +87,8 @@ graph_tool::feed_dict_type_t graph_tool::makeFeedDict(
 grid::point graph_tool::parseGraphOutToVector(
         std::vector<tensorflow::Tensor> const& out)
 {
+    if(out.empty())
+        return {};
     return graph_tool::tensorToPoint(out[0]);
 }
 

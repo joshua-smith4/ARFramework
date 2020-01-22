@@ -1,26 +1,42 @@
 import tensorflow as tf
 import numpy as np
-import argparse
 from tensorflow.python.framework import graph_util
 from tensorflow.python.framework import graph_io
-from tensorflow.keras.datasets import cifar10
+from readTrafficSigns import readTrafficSigns
+import argparse
+import os
+from sklearn.utils import shuffle
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--epochs', type=int, default=100)
-parser.add_argument('--index', type=int, default=100)
-parser.add_argument('--batch_size', type=int, default=200)
-parser.add_argument('--save_train', type=int, default=1)
-parser.add_argument('--output', default="cifar10_gradient.pb")
+parser.add_argument("--epochs", type=int, default=20)
+parser.add_argument("--path", default=os.path.join("/home", "jsmith", "GTSRB"))
+parser.add_argument('--batch_size', type=int, default=50)
+parser.add_argument('--width', type=int, default=50)
+parser.add_argument('--height', type=int, default=50)
+parser.add_argument('--output', default="gtsrb_gradient.pb")
 args = parser.parse_args()
-args.save_train = bool(args.save_train)
+
 tf.reset_default_graph()
 
-num_classes = 10
+x_train, y_train, x_test, y_test = readTrafficSigns(args.path, (args.width, args.height))
+x_train = x_train.astype('float32')/255.0
+x_test = x_test.astype('float32')/255.0
 
-input_layer = tf.placeholder(tf.float32, shape=(None, 32, 32, 3), name='input_layer_x')
+num_classes = len(np.unique(y_train))
+y_train = tf.keras.utils.to_categorical(y_train, num_classes)
+y_test = tf.keras.utils.to_categorical(y_test, num_classes)
 
+x_train, y_train = shuffle(x_train, y_train, random_state=0)
+x_test, y_test = shuffle(x_test, y_test, random_state=0)
 
-label_layer = tf.placeholder(tf.float32, shape=(None, 10), name='label_layer_y')
+input_shape = (None,) + x_train.shape[1:]
+print(input_shape)
+label_shape = (None, num_classes)
+print(label_shape)
+
+input_layer = tf.placeholder(tf.float32, shape=input_shape, name='input_layer_x')
+
+label_layer = tf.placeholder(tf.float32, shape=label_shape, name='label_layer_y')
 
 label_layer = tf.stop_gradient(label_layer, name="stopped_gradient_label")
 
@@ -60,7 +76,7 @@ flattened = tf.reshape(pool3, flat_shape, name='flattened')
 dense = tf.layers.dense(
         inputs=flattened, units=1024, activation=tf.nn.relu, name='dense_1')
 
-logits = tf.layers.dense(inputs=dense, units=10, name='logits')
+logits = tf.layers.dense(inputs=dense, units=num_classes, name='logits')
 classes = tf.argmax(input=logits, axis=1, name='classes')
 probabilities = tf.nn.softmax(logits, name="probabilities_out")
 loss = tf.nn.softmax_cross_entropy_with_logits(labels=label_layer, logits=logits, name='loss_func')
@@ -71,42 +87,6 @@ optimizer = tf.train.AdamOptimizer()
 train_op = optimizer.minimize(loss)
 correct = tf.nn.in_top_k(logits, tf.argmax(label_layer, axis=1), 1)
 accuracy = tf.reduce_mean(tf.cast(correct, tf.float32))
-
-(x_train, y_train), (x_test, y_test) = cifar10.load_data()
-
-y_train = tf.keras.utils.to_categorical(y_train, 10)
-y_test = tf.keras.utils.to_categorical(y_test, 10)
-
-x_train = x_train.astype('float32')
-x_test = x_test.astype('float32')
-
-x_train = x_train / np.float32(255.0)
-x_test = x_test / np.float32(255.0)
-
-if args.save_train:
-    x_init = x_test[args.index:args.index+1]
-    y_init = y_test[args.index:args.index+1]
-
-    file_name_x = 'cifar_{}.pb'.format(args.index) 
-    file_name_y = 'cifar_{}_label.pb'.format(args.index) 
-
-    x_proto = tf.make_tensor_proto(
-            x_init, dtype=x_init.dtype, shape=x_init.shape)
-
-    y_proto = tf.make_tensor_proto(
-            y_init, dtype=y_init.dtype, shape=y_init.shape)
-
-    with open(file_name_x, 'wb') as f:
-        f.write(x_proto.SerializeToString())
-
-    with open(file_name_y, 'wb') as f:
-        f.write(y_proto.SerializeToString())
-
-print(x_train.dtype)
-print(x_train.shape)
-print(y_train.dtype)
-print(y_train.shape)
-exit()
 
 init = tf.global_variables_initializer()
 with tf.Session() as sess:
