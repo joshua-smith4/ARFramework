@@ -454,17 +454,8 @@ grid::ModifiedFGSMWithFallbackRegionAbstraction::operator()(grid::region const& 
     auto e1_lowerbound = 1;
     auto e1_upperbound = 
         static_cast<int>(max_radius / granularity[min_dimension_index]);
-    auto e2_lowerbound = (long double)0.0;
-    auto e2_upperbound = 
-        (long double)max_radius / granularity[min_dimension_index] - 1.0;
 
     //std::default_random_engine rand_gen;
-    auto dist_e1 = 
-        std::uniform_int_distribution<int>(
-                e1_lowerbound, e1_upperbound);
-    auto dist_e2 = 
-        std::uniform_real_distribution<long double>(
-                e2_lowerbound, e2_upperbound);
     auto dist_R = std::uniform_int_distribution<int>(0,1);
 
     grid::abstraction_strategy_return_t retVal;
@@ -475,7 +466,6 @@ grid::ModifiedFGSMWithFallbackRegionAbstraction::operator()(grid::region const& 
     {
         auto e1 = 
             granularity[min_dimension_index] * (long double)i;
-        auto e2 = dist_e2(rand_gen);
         grid::point R(r.size());
         for(auto&& elem : R)
         {
@@ -483,7 +473,7 @@ grid::ModifiedFGSMWithFallbackRegionAbstraction::operator()(grid::region const& 
             if(elem != 1) elem = -1;
         }
         auto fgsm_part = elementWiseMult(grad_sign, M);
-        auto mod_part = constVecMult(e2, elementWiseMult(R, Mnot));
+        auto mod_part = elementWiseMult(R, Mnot);
         auto scaled_part = constVecMult(e1, fgsm_part + mod_part);
         auto generated_point = p + scaled_part;
         retVal.push_back(generated_point);

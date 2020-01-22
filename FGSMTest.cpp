@@ -31,6 +31,7 @@ int main(int argc, char* argv[])
     std::string enforce_domain_str = "true";
     std::string domain_range_min_str = "0.0";
     std::string domain_range_max_str = "1.0";
+    std::string modified_fgsm_dim_selection = "largest_first";
 
     std::vector<tensorflow::Flag> flag_list = {
         tensorflow::Flag("graph", &graph, "path to protobuf graph to be executed"),
@@ -48,6 +49,7 @@ int main(int argc, char* argv[])
         tensorflow::Flag("enforce_domain", &enforce_domain_str, "enforce the domain range (true, false)"),
         tensorflow::Flag("domain_range_min", &domain_range_min_str, "lower bound on domain range (default = 0.0)"),
         tensorflow::Flag("domain_range_max", &domain_range_max_str, "upper bound on domain range (default = 1.0)"),
+        tensorflow::Flag("modified_fgsm_dim_selection", &modified_fgsm_dim_selection, "dimension selection strategy to use (gradient_based, intellifeature, largest_first - default)"),
         tensorflow::Flag("fgsm_balance_factor", &fgsm_balance_factor_opt, "Balance factor for modified FGSM algorithm (ratio dimensions fgsm/random)")
     };
 
@@ -149,6 +151,9 @@ int main(int argc, char* argv[])
 
     grid::dimension_selection_strategy_t dimension_selection_strategy = 
         grid::largestDimFirst;
+    if(modified_fgsm_dim_selection == "largest_first")
+        std::cout << "Using largest first dimension selection strategy\n";
+
 
     auto hasAveragesProto = class_averages != "class_averages";
     auto hasLabelProto = label_proto != "label_proto";
@@ -160,9 +165,13 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    if(hasAveragesProto)
+    if(modified_fgsm_dim_selection == "random")
+        dimension_selection_strategy = 
+            grid::randomDimSelection;
+
+    if(hasAveragesProto && modified_fgsm_dim_selection == "intellifeature")
     {
-        std::cout << "Using IntellifeatureFGSM\n";
+        std::cout << "Using Intellifeature\n";
         std::string class_averages_path = 
             tensorflow::io::JoinPath(root_dir, class_averages);
         auto class_averages_proto_pair = 
@@ -192,28 +201,40 @@ int main(int argc, char* argv[])
     }
     auto label_tensor = label_tensor_pair.second;
 
+    std::cout << "FGSM Balance Factor: " << fgsm_balance_factor
+        << "\n";
+    auto grad_func = 
+            [&,label_tensor_copy = label_tensor]
+            (grid::point const& p) -> grid::point
+            {
+                auto createGradientFeedDict = 
+                [&]() -> graph_tool::feed_dict_type_t
+                {
+                    auto p_tensor = 
+                    graph_tool::pointToTensor(p, batch_input_shape);
+                    return {{input_layer, p_tensor},
+                        {label_layer, label_tensor_copy}};
+                };
+                auto retVal = gm.feedThroughModel(
+                        createGradientFeedDict,
+                        &graph_tool::parseGraphOutToVector,
+                        {gradient_layer});
+                if(!gm.ok())
+                    LOG(ERROR) << "Error with model";
+                return retVal;
+            };
+
+    if(modified_fgsm_dim_selection == "gradient_based")
+    {
+        std::cout << "Using gradient_based dimension selection\n";
+        dimension_selection_strategy = 
+            grid::GradientBasedDimensionSelection(grad_func);
+    }
+
     grid::region_abstraction_strategy_t abstraction_strategy = 
         grid::ModifiedFGSMWithFallbackRegionAbstraction(
                 1000u,
-                [&,label_tensor_copy = label_tensor]
-                (grid::point const& p) -> grid::point
-                {
-                    auto createGradientFeedDict = 
-                    [&]() -> graph_tool::feed_dict_type_t
-                    {
-                        auto p_tensor = 
-                        graph_tool::pointToTensor(p, batch_input_shape);
-                        return {{input_layer, p_tensor},
-                            {label_layer, label_tensor_copy}};
-                    };
-                    auto retVal = gm.feedThroughModel(
-                            createGradientFeedDict,
-                            &graph_tool::parseGraphOutToVector,
-                            {gradient_layer});
-                    if(!gm.ok())
-                        LOG(ERROR) << "Error with model";
-                    return retVal;
-                },
+                grad_func,
                 dimension_selection_strategy,
                 grid::RandomPointRegionAbstraction(1u),
                 granularity,
@@ -269,14 +290,17 @@ int main(int argc, char* argv[])
                 auto class_out = 
                     graph_tool::getClassOfClassificationVector(
                             logits_out);
-                return class_out == orig_class;
+                if(class_out == orig_class)
+                    return true;
+                return false;
             };
 
     auto numAdvExamples = 0u;
     for(auto&& pt : unique_abstractions)
     {
-        if(!pointIsSafe(pt))
-            ++numAdvExamples;
+        if(pointIsSafe(pt))
+            continue;
+        ++numAdvExamples;
     }
     std::cout << "Number Adversarial Examples: "
         << numAdvExamples << "\n";

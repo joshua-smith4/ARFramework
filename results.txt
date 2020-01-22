@@ -1,1 +1,20 @@
+FGSM Test
+mnist
+enforce_granularity = false
+enforce_domain = false
+fgsm_balance = 1
+81   63
+
+mnist
+enforce_granularity = false
+enforce_domain = false
+fgsm_balance = 0.95
+81   77
+
+mnist
+enforce_granularity = false
+enforce_domain = false
+fgsm_balance = 0.9
+81   78
+
 mnist intellifeature largest_first
