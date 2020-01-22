@@ -3,36 +3,42 @@ from tensorflow.keras import backend as K
 import tensorflow as tf
 import numpy as np
 import argparse
+import os
+from readTrafficSigns import readTrafficSigns
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("-i", "--index", default=1, type=int)
+parser.add_argument("-i", "--index", default=100, type=int)
+parser.add_argument("--path", default=os.path.join("/home", "jsmith", "GTSRB"))
 args = parser.parse_args()
 
-(x_train, y_train), (x_test, y_test) = mnist.load_data()
+x_train, y_train, x_test, y_test = readTrafficSigns(args.path)
 
-img_rows = 28
-img_cols = 28
+img_rows = 100
+img_cols = 100
+
+num_classes = len(np.unique(y_train))
 
 if K.image_data_format() == 'channels_first':
-    x_train = x_train.reshape(x_train.shape[0], 1, img_rows, img_cols)
-    x_test = x_test.reshape(x_test.shape[0], 1, img_rows, img_cols)
-    input_shape = (1, img_rows, img_cols)
+    x_train = x_train.reshape(x_train.shape[0], 3, img_rows, img_cols)
+    x_test = x_test.reshape(x_test.shape[0], 3, img_rows, img_cols)
+    input_shape = (3, img_rows, img_cols)
 else:
-    x_train = x_train.reshape(x_train.shape[0], img_rows, img_cols, 1)
-    x_test = x_test.reshape(x_test.shape[0], img_rows, img_cols, 1)
-    input_shape = (img_rows, img_cols, 1)
+    x_train = x_train.reshape(x_train.shape[0], img_rows, img_cols, 3)
+    x_test = x_test.reshape(x_test.shape[0], img_rows, img_cols, 3)
+    input_shape = (img_rows, img_cols, 3)
 
 x_train = x_train.astype('float32')
-x_train /= 255
+x_train /= 255.0
 
-y_train = tf.keras.utils.to_categorical(y_train, 10)
+y_train = tf.keras.utils.to_categorical(y_train, num_classes)
+y_train = y_train.astype(np.int32)
 
 x_init = x_train[args.index:args.index+1]
 y_init = y_train[args.index:args.index+1]
 
-file_name_x = 'mnist_{}.pb'.format(args.index) 
-file_name_y = 'mnist_{}_label.pb'.format(args.index) 
+file_name_x = 'gtsrb_{}.pb'.format(args.index) 
+file_name_y = 'gtsrb_{}_label.pb'.format(args.index) 
 
 x_proto = tf.make_tensor_proto(
         x_init, dtype=x_init.dtype, shape=x_init.shape)

@@ -28,11 +28,15 @@ def readTrafficSigns(rootpath):
     Returns:   list of images, list of corresponding labels'''
     imageHeight = 100
     imageWidth = 100
-    images = [] # images
-    labels = [] # corresponding labels
-    # loop over all 42 classes
+    images_train = [] # images
+    images_test = []
+    labels_train = [] # corresponding labels
+    labels_test = [] # corresponding labels
+    # training data
+    training_path = os.path.join(rootpath, "Final_Training", "Images")
+    testing_path = os.path.join(rootpath, "Final_Test", "Images")
     for c in range(0,43):
-        prefix = os.path.join(rootpath, format(c, '05d')) # subdirectory for class
+        prefix = os.path.join(training_path, format(c, '05d')) # subdirectory for class
         with open(os.path.join(prefix, 'GT-' + format(c, '05d') + '.csv')) as gtFile:
             gtReader = csv.reader(gtFile, delimiter=';') # csv parser for annotations file
             next(gtReader) # skip header
@@ -41,7 +45,20 @@ def readTrafficSigns(rootpath):
                 image = plt.imread(os.path.join(prefix, row[0]))
                 image = cv2.resize(image, dsize=(imageWidth,imageHeight), 
                         interpolation=cv2.INTER_CUBIC)
-                image = np.reshape(image, (1,imageWidth,imageHeight,3))
-                images.append(image) # the 1th column is the filename
-                labels.append(int(row[7])) # the 8th column is the label
-    return np.concatenate(images, axis=0), np.array(labels)
+                image = np.expand_dims(image, axis=0)
+                images_train.append(image) 
+                labels_train.append(int(row[7])) 
+
+    # test data
+    with open(os.path.join(testing_path, "GT-final_test.csv")) as gtFile:
+        gtReader = csv.reader(gtFile, delimiter=';') # csv parser for annotations file
+        next(gtReader) # skip header
+        # loop over all images in current annotations file
+        for row in gtReader:
+            image = plt.imread(os.path.join(testing_path, row[0]))
+            image = cv2.resize(image, dsize=(imageWidth,imageHeight), 
+                    interpolation=cv2.INTER_CUBIC)
+            image = np.expand_dims(image, axis=0)
+            images_test.append(image) 
+            labels_test.append(int(row[7])) 
+    return np.concatenate(images_train, axis=0), np.array(labels_train), np.concatenate(images_test, axis=0), np.array(labels_test)
