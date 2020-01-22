@@ -10,6 +10,7 @@ parser.add_argument('--epochs', type=int, default=100)
 parser.add_argument('--index', type=int, default=100)
 parser.add_argument('--batch_size', type=int, default=200)
 parser.add_argument('--save_train', type=int, default=1)
+parser.add_argument('--output', default="cifar10_gradient.pb")
 args = parser.parse_args()
 args.save_train = bool(args.save_train)
 tf.reset_default_graph()
@@ -101,6 +102,12 @@ if args.save_train:
     with open(file_name_y, 'wb') as f:
         f.write(y_proto.SerializeToString())
 
+print(x_train.dtype)
+print(x_train.shape)
+print(y_train.dtype)
+print(y_train.shape)
+exit()
+
 init = tf.global_variables_initializer()
 with tf.Session() as sess:
     init.run()
@@ -125,5 +132,5 @@ with tf.Session() as sess:
             sess.graph.as_graph_def(), 
             ['probabilities_out', 'gradient_out'])
 
-    graph_io.write_graph(constant_graph, '.', 'cifar_gradient.pb', as_text=False)
+    graph_io.write_graph(constant_graph, '.', args.output, as_text=False)
 

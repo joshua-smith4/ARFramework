@@ -21,13 +21,11 @@ import cv2
 # function for reading the images
 # arguments: path to the traffic sign data, for example './GTSRB/Training'
 # returns: list of images, list of corresponding labels 
-def readTrafficSigns(rootpath):
+def readTrafficSigns(rootpath, size):
     '''Reads traffic sign data for German Traffic Sign Recognition Benchmark.
 
     Arguments: path to the traffic sign data, for example './GTSRB/Training'
     Returns:   list of images, list of corresponding labels'''
-    imageHeight = 100
-    imageWidth = 100
     images_train = [] # images
     images_test = []
     labels_train = [] # corresponding labels
@@ -43,7 +41,7 @@ def readTrafficSigns(rootpath):
             # loop over all images in current annotations file
             for row in gtReader:
                 image = plt.imread(os.path.join(prefix, row[0]))
-                image = cv2.resize(image, dsize=(imageWidth,imageHeight), 
+                image = cv2.resize(image, dsize=size, 
                         interpolation=cv2.INTER_CUBIC)
                 image = np.expand_dims(image, axis=0)
                 images_train.append(image) 
@@ -56,7 +54,7 @@ def readTrafficSigns(rootpath):
         # loop over all images in current annotations file
         for row in gtReader:
             image = plt.imread(os.path.join(testing_path, row[0]))
-            image = cv2.resize(image, dsize=(imageWidth,imageHeight), 
+            image = cv2.resize(image, dsize=size, 
                     interpolation=cv2.INTER_CUBIC)
             image = np.expand_dims(image, axis=0)
             images_test.append(image) 

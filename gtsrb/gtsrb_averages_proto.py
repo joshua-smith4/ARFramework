@@ -8,9 +8,11 @@ from readTrafficSigns import readTrafficSigns
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--path", default=os.path.join("/home", "jsmith", "GTSRB"))
+parser.add_argument("--width", type=int, default=50)
+parser.add_argument("--height", type=int, default=50)
 args = parser.parse_args()
 
-x_train, y_train, x_test, y_test = readTrafficSigns(args.path)
+x_train, y_train, x_test, y_test = readTrafficSigns(args.path, (args.width,args.height))
 img_rows = x_train.shape[1]
 img_cols = x_train.shape[2]
 

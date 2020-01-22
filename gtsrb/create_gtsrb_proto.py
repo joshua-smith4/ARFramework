@@ -10,31 +10,20 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("-i", "--index", default=100, type=int)
 parser.add_argument("--path", default=os.path.join("/home", "jsmith", "GTSRB"))
+parser.add_argument("--width", type=int, default=50)
+parser.add_argument("--height", type=int, default=50)
 
 args = parser.parse_args()
 
-x_train, y_train, x_test, y_test = readTrafficSigns(args.path)
-
-img_rows = 100
-img_cols = 100
+x_train, y_train, x_test, y_test = readTrafficSigns(args.path,(args.width,args.height))
 
 num_classes = len(np.unique(y_train))
 
-if K.image_data_format() == 'channels_first':
-    x_train = x_train.reshape(x_train.shape[0], 3, img_rows, img_cols)
-    x_test = x_test.reshape(x_test.shape[0], 3, img_rows, img_cols)
-    input_shape = (3, img_rows, img_cols)
-else:
-    x_train = x_train.reshape(x_train.shape[0], img_rows, img_cols, 3)
-    x_test = x_test.reshape(x_test.shape[0], img_rows, img_cols, 3)
-    input_shape = (img_rows, img_cols, 3)
-
 x_train = x_train.astype('float32')
 x_train /= 255.0
-print("original class:", y_train[args.index])
 
 y_train = tf.keras.utils.to_categorical(y_train, num_classes)
-y_train = y_train.astype(np.int32)
+#y_train = y_train.astype(np.int32)
 
 x_init = x_train[args.index:args.index+1]
 y_init = y_train[args.index:args.index+1]
