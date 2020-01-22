@@ -10,6 +10,7 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("-i", "--index", default=100, type=int)
 parser.add_argument("--path", default=os.path.join("/home", "jsmith", "GTSRB"))
+
 args = parser.parse_args()
 
 x_train, y_train, x_test, y_test = readTrafficSigns(args.path)
@@ -30,6 +31,7 @@ else:
 
 x_train = x_train.astype('float32')
 x_train /= 255.0
+print("original class:", y_train[args.index])
 
 y_train = tf.keras.utils.to_categorical(y_train, num_classes)
 y_train = y_train.astype(np.int32)
