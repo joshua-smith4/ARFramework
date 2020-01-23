@@ -31,6 +31,7 @@ int main(int argc, char* argv[])
     std::string domain_range_min_str = "0.0";
     std::string domain_range_max_str = "1.0";
     std::string modified_fgsm_dim_selection = "largest_first";
+    std::string num_abstractions_str = "1000";
 
     std::vector<tensorflow::Flag> flag_list = {
         tensorflow::Flag("graph", &graph, "path to protobuf graph to be executed"),
@@ -48,6 +49,7 @@ int main(int argc, char* argv[])
         tensorflow::Flag("domain_range_min", &domain_range_min_str, "lower bound on domain range (default = 0.0)"),
         tensorflow::Flag("domain_range_max", &domain_range_max_str, "upper bound on domain range (default = 1.0)"),
         tensorflow::Flag("modified_fgsm_dim_selection", &modified_fgsm_dim_selection, "dimension selection strategy to use (gradient_based, intellifeature, largest_first - default)"),
+        tensorflow::Flag("num_abstractions", &num_abstractions_str, "number of abstractions to generate (adversarial examples)"),
         tensorflow::Flag("fgsm_balance_factor", &fgsm_balance_factor_opt, "Balance factor for modified FGSM algorithm (ratio dimensions fgsm/random)")
     };
 
@@ -86,6 +88,7 @@ int main(int argc, char* argv[])
     auto fgsm_balance_factor = std::atof(fgsm_balance_factor_opt.c_str());
     auto domain_range_min = std::atof(domain_range_min_str.c_str());
     auto domain_range_max = std::atof(domain_range_max_str.c_str());
+    auto num_abstractions = std::atoi(num_abstractions_str.c_str());
     auto graph_path = tensorflow::io::JoinPath(root_dir, graph);
     GraphManager gm(graph_path);
     if(!gm.ok())
@@ -230,7 +233,7 @@ int main(int argc, char* argv[])
 
     grid::region_abstraction_strategy_t abstraction_strategy = 
         grid::ModifiedFGSMWithFallbackRegionAbstraction(
-                1000u,
+                num_abstractions,
                 grad_func,
                 dimension_selection_strategy,
                 grid::RandomPointRegionAbstraction(1u),

@@ -187,28 +187,12 @@ void ARFramework::worker_routine()
                             auto snapped_pt = grid::snapToDomainRange(
                                     discrete_pt,
                                     domain_range);
-                            /*
-                            auto snapped_pt = grid::snapToDomainRange(
-                                    pt,
-                                    domain_range);
-                            */
                             if(grid::isInDomainRange(
                                         snapped_pt, orig_region))
                             {
-                                /*
-                                all_abstracted_points.push_back(
-                                        snapped_pt);
-                                */
                                 all_abstracted_points.insert(
                                         snapped_pt);
                             }
-                            /*
-                            else
-                            {
-                                LOG(ERROR)
-                                    << "Point was outside domain range\n";
-                            }
-                            */
                         }
                     }
 
@@ -217,11 +201,6 @@ void ARFramework::worker_routine()
                     for(auto&& pt : all_abstracted_points)
                     {
                         if(safety_predicate(pt)) continue;
-                        /*
-                        auto in_deleted = deleted_regions.find(pt);
-                        if(deleted_regions.end() != in_deleted)
-                            continue;
-                        */
                         {
                             std::lock_guard<std::mutex> lock(ae_mutex);
                             adversarialExamples.insert(pt);
@@ -247,9 +226,6 @@ void ARFramework::worker_routine()
                                 potentiallyUnsafeRegions.erase(
                                         found_region);
                             }
-                            else
-                            {
-                            }
                         }
                     }
                     {
@@ -263,12 +239,6 @@ void ARFramework::worker_routine()
                     }
                     {
                         std::lock_guard<std::mutex> lock(pur_mutex);
-                        /*
-                        std::copy(subregions.begin(),
-                                subregions.end(),
-                                std::back_inserter(potentiallyUnsafeRegions)
-                                );
-                        */
                         std::copy(subregions.begin(),
                                 subregions.end(),
                                 std::inserter(potentiallyUnsafeRegions,

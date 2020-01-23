@@ -457,15 +457,16 @@ grid::ModifiedFGSMWithFallbackRegionAbstraction::operator()(grid::region const& 
 
     //std::default_random_engine rand_gen;
     auto dist_R = std::uniform_int_distribution<int>(0,1);
+    auto e1_dist = std::uniform_int_distribution<int>(
+            e1_lowerbound, e1_upperbound);
 
     grid::abstraction_strategy_return_t retVal;
     retVal.reserve(maxPoints);
-    for(int i = e1_upperbound; 
-            i >= e1_lowerbound && e1_upperbound - i < maxPoints; 
-            --i)
+    for(int i = 0; i < maxPoints; ++i)
     {
         auto e1 = 
-            granularity[min_dimension_index] * (long double)i;
+            granularity[min_dimension_index] * 
+            static_cast<long double>(e1_dist(rand_gen));
         grid::point R(r.size());
         for(auto&& elem : R)
         {
