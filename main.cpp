@@ -166,6 +166,32 @@ int main(int argc, char* argv[])
     unsigned orig_class = 
         graph_tool::getClassOfClassificationVector(logits_init_activation);
 
+    auto hasLabelProto = label_proto != "label_proto";
+    if(hasLabelProto)
+    {
+        auto label_tensor_path = 
+            tensorflow::io::JoinPath(root_dir, label_proto);
+        auto label_tensor_pair =
+            GraphManager::ReadBinaryTensorProto(label_tensor_path);
+        if(!label_tensor_pair.first)
+        {
+            LOG(ERROR) << "Unable to read label proto";
+            exit(1);
+        }
+        auto label_tensor = label_tensor_pair.second;
+        auto label_class = graph_tool::getClassOfClassificationTensor(
+                label_tensor);
+        if(label_class != orig_class)
+        {
+            LOG(ERROR) 
+                << "Label and orig_class do not agree\nlabel class: "
+                << label_class
+                << " classification of initial input: "
+                << orig_class;
+            exit(1);
+        }
+    }
+
     for(auto i = 0u; i < 20u; ++i)
     {
         auto tmp = 
@@ -256,7 +282,6 @@ int main(int argc, char* argv[])
         }
     }
 
-    auto hasLabelProto = label_proto != "label_proto";
     auto hasLabelLayer = label_layer != "label_layer_placeholder";
     auto canUseGradient = 
         hasGradientLayer 

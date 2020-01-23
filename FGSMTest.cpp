@@ -27,6 +27,11 @@ int main(int argc, char* argv[])
     std::string label_proto = "label_proto";
     std::string label_layer = "label_layer_placeholder";
     std::string fgsm_balance_factor_opt = "1.0";
+    std::string enforce_domain_str = "true";
+    std::string domain_range_min_str = "0.0";
+    std::string domain_range_max_str = "1.0";
+    std::string modified_fgsm_dim_selection = "largest_first";
+    std::string num_abstractions_str = "1000";
 
     std::vector<tensorflow::Flag> flag_list = {
         tensorflow::Flag("graph", &graph, "path to protobuf graph to be executed"),
@@ -40,6 +45,11 @@ int main(int argc, char* argv[])
         tensorflow::Flag("class_averages", &class_averages, "the class averages of the training data (optional - used for FGSM)"),
         tensorflow::Flag("label_proto", &label_proto, "protocol buffer of label image corresponding with initial activation"),
         tensorflow::Flag("label_layer", &label_layer, "name of label layer"),
+        tensorflow::Flag("enforce_domain", &enforce_domain_str, "enforce the domain range (true, false)"),
+        tensorflow::Flag("domain_range_min", &domain_range_min_str, "lower bound on domain range (default = 0.0)"),
+        tensorflow::Flag("domain_range_max", &domain_range_max_str, "upper bound on domain range (default = 1.0)"),
+        tensorflow::Flag("modified_fgsm_dim_selection", &modified_fgsm_dim_selection, "dimension selection strategy to use (gradient_based, intellifeature, largest_first - default)"),
+        tensorflow::Flag("num_abstractions", &num_abstractions_str, "number of abstractions to generate (adversarial examples)"),
         tensorflow::Flag("fgsm_balance_factor", &fgsm_balance_factor_opt, "Balance factor for modified FGSM algorithm (ratio dimensions fgsm/random)")
     };
 
@@ -57,6 +67,7 @@ int main(int argc, char* argv[])
         return -1;
     }
 
+    const auto enforce_domain = enforce_domain_str == "true";
     if(gradient_layer == "gradient_layer_tmp_placeholder")
     {
         LOG(ERROR) << "must provide gradient layer\n";
@@ -75,6 +86,9 @@ int main(int argc, char* argv[])
     auto granularity_val = std::atof(granularity_str.c_str());
     auto radius = std::atof(verification_radius.c_str());
     auto fgsm_balance_factor = std::atof(fgsm_balance_factor_opt.c_str());
+    auto domain_range_min = std::atof(domain_range_min_str.c_str());
+    auto domain_range_max = std::atof(domain_range_max_str.c_str());
+    auto num_abstractions = std::atoi(num_abstractions_str.c_str());
     auto graph_path = tensorflow::io::JoinPath(root_dir, graph);
     GraphManager gm(graph_path);
     if(!gm.ok())
@@ -137,6 +151,9 @@ int main(int argc, char* argv[])
 
     grid::dimension_selection_strategy_t dimension_selection_strategy = 
         grid::largestDimFirst;
+    if(modified_fgsm_dim_selection == "largest_first")
+        std::cout << "Using largest first dimension selection strategy\n";
+
 
     auto hasAveragesProto = class_averages != "class_averages";
     auto hasLabelProto = label_proto != "label_proto";
@@ -148,9 +165,16 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    if(hasAveragesProto)
+    if(modified_fgsm_dim_selection == "random")
     {
-        std::cout << "Using IntellifeatureFGSM\n";
+        std::cout << "Using random dimension selection heuristic\n";
+        dimension_selection_strategy = 
+            grid::randomDimSelection;
+    }
+
+    if(hasAveragesProto && modified_fgsm_dim_selection == "intellifeature")
+    {
+        std::cout << "Using Intellifeature\n";
         std::string class_averages_path = 
             tensorflow::io::JoinPath(root_dir, class_averages);
         auto class_averages_proto_pair = 
@@ -180,28 +204,40 @@ int main(int argc, char* argv[])
     }
     auto label_tensor = label_tensor_pair.second;
 
+    std::cout << "FGSM Balance Factor: " << fgsm_balance_factor
+        << "\n";
+    auto grad_func = 
+            [&,label_tensor_copy = label_tensor]
+            (grid::point const& p) -> grid::point
+            {
+                auto createGradientFeedDict = 
+                [&]() -> graph_tool::feed_dict_type_t
+                {
+                    auto p_tensor = 
+                    graph_tool::pointToTensor(p, batch_input_shape);
+                    return {{input_layer, p_tensor},
+                        {label_layer, label_tensor_copy}};
+                };
+                auto retVal = gm.feedThroughModel(
+                        createGradientFeedDict,
+                        &graph_tool::parseGraphOutToVector,
+                        {gradient_layer});
+                if(!gm.ok())
+                    LOG(ERROR) << "Error with model";
+                return retVal;
+            };
+
+    if(modified_fgsm_dim_selection == "gradient_based")
+    {
+        std::cout << "Using gradient_based dimension selection\n";
+        dimension_selection_strategy = 
+            grid::GradientBasedDimensionSelection(grad_func);
+    }
+
     grid::region_abstraction_strategy_t abstraction_strategy = 
         grid::ModifiedFGSMWithFallbackRegionAbstraction(
-                1000u,
-                [&,label_tensor_copy = label_tensor]
-                (grid::point const& p) -> grid::point
-                {
-                    auto createGradientFeedDict = 
-                    [&]() -> graph_tool::feed_dict_type_t
-                    {
-                        auto p_tensor = 
-                        graph_tool::pointToTensor(p, batch_input_shape);
-                        return {{input_layer, p_tensor},
-                            {label_layer, label_tensor_copy}};
-                    };
-                    auto retVal = gm.feedThroughModel(
-                            createGradientFeedDict,
-                            &graph_tool::parseGraphOutToVector,
-                            {gradient_layer});
-                    if(!gm.ok())
-                        LOG(ERROR) << "Error with model";
-                    return retVal;
-                },
+                num_abstractions,
+                grad_func,
                 dimension_selection_strategy,
                 grid::RandomPointRegionAbstraction(1u),
                 granularity,
@@ -219,8 +255,8 @@ int main(int argc, char* argv[])
     grid::region domain_range(orig_region.size());
     for(auto i = 0u; i < domain_range.size(); ++i)
     {
-        domain_range[i].first = 0.0;
-        domain_range[i].second = 1.0;
+        domain_range[i].first = domain_range_min;
+        domain_range[i].second = domain_range_max;
     }
 
     orig_region = grid::snapToDomainRange(orig_region, domain_range);
@@ -229,11 +265,14 @@ int main(int argc, char* argv[])
     std::set<grid::point> unique_abstractions;
     for(auto&& pt : abstractions)
     {
-        auto discrete_pt = grid::enforceSnapDiscreteGrid(
-                pt, init_act_point, granularity);
-        auto snapped_pt = grid::snapToDomainRange(discrete_pt, 
-                domain_range);
-        unique_abstractions.insert(snapped_pt);
+        auto pt_to_add = grid::enforceSnapDiscreteGrid(
+            pt, init_act_point, granularity);
+        if(enforce_domain)
+        {
+            pt_to_add = grid::snapToDomainRange(
+                    pt_to_add, domain_range);
+        }
+        unique_abstractions.insert(pt_to_add);
     }
     std::cout << "Unique Abstractions: " 
         << unique_abstractions.size() << "\n";
@@ -256,11 +295,14 @@ int main(int argc, char* argv[])
     auto numAdvExamples = 0u;
     for(auto&& pt : unique_abstractions)
     {
-        if(!pointIsSafe(pt))
-            ++numAdvExamples;
+        if(pointIsSafe(pt))
+            continue;
+        ++numAdvExamples;
     }
     std::cout << "Number Adversarial Examples: "
         << numAdvExamples << "\n";
+    auto success_rate = (double)numAdvExamples / (double)unique_abstractions.size() * 100.0;
+    std::cout << "Success Rate: " << success_rate << "\n";
 
     return 0;
 }

@@ -1,0 +1,152 @@
+FGSM Test
+mnist
+fgsm_balance = 0.99
+gradient_based
+976   620   63.5246
+
+mnist
+fgsm_balance = 0.8
+gradient_based
+1000  628   62.8
+
+mnist
+fgsm_balance = 0.7
+gradient_based
+1000  613   61.3
+
+mnist
+fgsm_balance = 0.6
+gradient_based
+1000  589   58.9
+
+mnist
+fgsm_balance = 0.5
+gradient_based
+1000  573   57.3
+
+mnist
+fgsm_balance = 0.4
+gradient_based
+1000  520   52.0
+
+mnist
+fgsm_balance = 0.3
+gradient_based
+1000  449   44.9
+
+mnist
+fgsm_balance = 0.2
+gradient_based
+1000  346   34.6
+
+mnist
+fgsm_balance = 0.1
+gradient_based
+1000  138   13.8
+
+mnist
+fgsm_balance = 0.05
+gradient_based
+1000  13    1.3
+
+mnist
+fgsm_balance = 0.05
+random
+1000  0     0
+
+mnist
+fgsm_balance = 0.1
+random
+1000  0     0
+
+mnist
+fgsm_balance = 0.2
+random
+1000  4     0.4
+
+mnist
+fgsm_balance = 0.3
+random
+1000  37     3.7
+
+mnist
+fgsm_balance = 0.4
+random
+1000  157    15.7
+
+mnist
+fgsm_balance = 0.5
+random
+1000  292    
+
+mnist
+fgsm_balance = 0.6
+random
+1000  369
+
+mnist
+fgsm_balance = 0.7
+random
+1000  441
+
+mnist
+fgsm_balance = 0.8
+random
+1000  519
+
+mnist
+fgsm_balance = 0.99
+random
+966  614    63.5611
+
+mnist
+fgsm_balance = 0.99
+intellifeature
+971  618    63.6457
+
+mnist
+fgsm_balance = 0.8
+intellifeature
+1000  502
+
+mnist
+fgsm_balance = 0.7
+intellifeature
+1000  456
+
+mnist
+fgsm_balance = 0.6
+intellifeature
+1000  402
+
+mnist
+fgsm_balance = 0.5
+intellifeature
+1000  336
+
+mnist
+fgsm_balance = 0.4
+intellifeature
+1000  313
+
+mnist
+fgsm_balance = 0.3
+intellifeature
+1000  262
+
+mnist
+fgsm_balance = 0.2
+intellifeature
+1000  189
+
+mnist
+fgsm_balance = 0.1
+intellifeature
+1000  43
+
+mnist
+fgsm_balance = 0.05
+intellifeature
+1000  9
+
+mnist intellifeature largest_first

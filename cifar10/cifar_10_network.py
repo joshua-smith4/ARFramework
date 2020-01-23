@@ -102,12 +102,6 @@ if args.save_train:
     with open(file_name_y, 'wb') as f:
         f.write(y_proto.SerializeToString())
 
-print(x_train.dtype)
-print(x_train.shape)
-print(y_train.dtype)
-print(y_train.shape)
-exit()
-
 init = tf.global_variables_initializer()
 with tf.Session() as sess:
     init.run()
