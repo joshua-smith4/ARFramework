@@ -166,8 +166,11 @@ int main(int argc, char* argv[])
     }
 
     if(modified_fgsm_dim_selection == "random")
+    {
+        std::cout << "Using random dimension selection heuristic\n";
         dimension_selection_strategy = 
             grid::randomDimSelection;
+    }
 
     if(hasAveragesProto && modified_fgsm_dim_selection == "intellifeature")
     {
