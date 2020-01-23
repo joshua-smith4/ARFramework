@@ -301,6 +301,8 @@ int main(int argc, char* argv[])
     }
     std::cout << "Number Adversarial Examples: "
         << numAdvExamples << "\n";
+    auto success_rate = (double)numAdvExamples / (double)unique_abstractions.size() * 100.0;
+    std::cout << "Success Rate: " << success_rate << "\n";
 
     return 0;
 }
