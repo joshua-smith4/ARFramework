@@ -1,6 +1,5 @@
 FGSM Test
 mnist
-enforce_granularity = false
 enforce_domain = false
 fgsm_balance = 1
 81   63

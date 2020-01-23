@@ -27,7 +27,6 @@ int main(int argc, char* argv[])
     std::string label_proto = "label_proto";
     std::string label_layer = "label_layer_placeholder";
     std::string fgsm_balance_factor_opt = "1.0";
-    std::string enforce_granularity_str = "true";
     std::string enforce_domain_str = "true";
     std::string domain_range_min_str = "0.0";
     std::string domain_range_max_str = "1.0";
@@ -45,7 +44,6 @@ int main(int argc, char* argv[])
         tensorflow::Flag("class_averages", &class_averages, "the class averages of the training data (optional - used for FGSM)"),
         tensorflow::Flag("label_proto", &label_proto, "protocol buffer of label image corresponding with initial activation"),
         tensorflow::Flag("label_layer", &label_layer, "name of label layer"),
-        tensorflow::Flag("enforce_granularity", &enforce_granularity_str, "enforce the granularity (true, false)"),
         tensorflow::Flag("enforce_domain", &enforce_domain_str, "enforce the domain range (true, false)"),
         tensorflow::Flag("domain_range_min", &domain_range_min_str, "lower bound on domain range (default = 0.0)"),
         tensorflow::Flag("domain_range_max", &domain_range_max_str, "upper bound on domain range (default = 1.0)"),
@@ -67,7 +65,6 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    const auto enforce_granularity = enforce_granularity_str == "true";
     const auto enforce_domain = enforce_domain_str == "true";
     if(gradient_layer == "gradient_layer_tmp_placeholder")
     {
@@ -262,12 +259,8 @@ int main(int argc, char* argv[])
     std::set<grid::point> unique_abstractions;
     for(auto&& pt : abstractions)
     {
-        auto pt_to_add = pt;
-        if(enforce_granularity)
-        {
-            pt_to_add = grid::enforceSnapDiscreteGrid(
-                pt_to_add, init_act_point, granularity);
-        }
+        auto pt_to_add = grid::enforceSnapDiscreteGrid(
+            pt, init_act_point, granularity);
         if(enforce_domain)
         {
             pt_to_add = grid::snapToDomainRange(
@@ -290,9 +283,7 @@ int main(int argc, char* argv[])
                 auto class_out = 
                     graph_tool::getClassOfClassificationVector(
                             logits_out);
-                if(class_out == orig_class)
-                    return true;
-                return false;
+                return class_out == orig_class;
             };
 
     auto numAdvExamples = 0u;
