@@ -466,8 +466,6 @@ int main(int argc, char* argv[])
         file_name << timestamp 
             << "_" << index << "_" << orig_class << "_" 
             << classification << ".pb";
-        std::cout << "Class of adversarial example: " 
-            << classification << "\n";
         ++index;
         auto file_path = tensorflow::io::JoinPath(output_dir, 
                 file_name.str());
